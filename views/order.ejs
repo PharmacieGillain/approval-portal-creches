@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commande #<%= order.order_number %> — Portail Mutterfirma</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="8" fill="#1e3a5f"/>
+        <path d="M24 10C16.27 10 10 16.27 10 24s6.27 14 14 14 14-6.27 14-14S31.73 10 24 10zm2 21h-4v-4h4v4zm0-8h-4V15h4v8z" fill="white"/>
+      </svg>
+      <span>Portail Mutterfirma</span>
+    </div>
+    <div class="navbar-links">
+      <a href="/tableau-de-bord" class="nav-link">Tableau de bord</a>
+      <a href="/historique" class="nav-link">Historique</a>
+      <a href="/deconnexion" class="nav-link">Déconnexion</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <% if (error) { %>
+      <div class="alert alert-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <%= error %>
+      </div>
+    <% } %>
+    <% if (success) { %>
+      <div class="alert alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <%= success %>
+      </div>
+    <% } %>
+
+    <div class="order-header-bar">
+      <div>
+        <h1 class="page-title">Commande #<%= order.order_number %></h1>
+        <p class="page-subtitle">Passée le <%= formatDateTime(order.created_at) %></p>
+      </div>
+      <span class="badge badge-pending">En attente de validation</span>
+    </div>
+
+    <!-- Info panels -->
+    <div class="info-grid">
+      <div class="card">
+        <h2 class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v2h20v-2c0-3.3-6.7-5-10-5z"/></svg>
+          Informations client
+        </h2>
+        <dl class="info-list">
+          <dt>Client</dt>
+          <dd><%= getCustomerName(order) %></dd>
+
+          <% const company = getCompanyName(order); %>
+          <% if (company) { %>
+          <dt>Établissement</dt>
+          <dd><strong><%= company %></strong></dd>
+          <% } %>
+
+          <% if (order.email) { %>
+          <dt>Email</dt>
+          <dd><a href="mailto:<%= order.email %>" class="link"><%= order.email %></a></dd>
+          <% } %>
+
+          <% if (order.phone) { %>
+          <dt>Téléphone</dt>
+          <dd><%= order.phone %></dd>
+          <% } %>
+
+          <% if (order.billing_address) { %>
+          <dt>Adresse</dt>
+          <dd>
+            <%= order.billing_address.address1 %>
+            <% if (order.billing_address.address2) { %><br><%= order.billing_address.address2 %><% } %>
+            <br><%= order.billing_address.zip %> <%= order.billing_address.city %>
+          </dd>
+          <% } %>
+        </dl>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.3-.6-3-1.2-3-2.2 0-1.1 1-1.9 2.7-1.9 1.8 0 2.4.9 2.5 2.1h2.2c-.1-1.7-1.1-3.3-3.2-3.8V3h-3v2.1C9.5 5.4 8 6.5 8 8.2c0 2 1.6 2.9 4 3.5 2.5.6 3 1.5 3 2.4 0 .7-.5 1.8-2.7 1.8-2.1 0-2.9-.9-3-2.1H7.1c.1 2.2 1.8 3.4 3.7 3.7V20h3v-2.4c1.9-.4 3.4-1.4 3.4-3.3 0-2.5-2.1-3.4-4.4-4z"/></svg>
+          Résumé financier
+        </h2>
+        <dl class="info-list">
+          <dt>Sous-total</dt>
+          <dd><%= parseFloat(order.subtotal_price).toFixed(2) %> <%= order.currency %></dd>
+
+          <% if (parseFloat(order.total_discounts) > 0) { %>
+          <dt>Remises</dt>
+          <dd class="text-success">− <%= parseFloat(order.total_discounts).toFixed(2) %> <%= order.currency %></dd>
+          <% } %>
+
+          <% const shippingAmt = parseFloat(order.total_shipping_price_set?.shop_money?.amount || 0); %>
+          <% if (shippingAmt > 0) { %>
+          <dt>Livraison</dt>
+          <dd><%= shippingAmt.toFixed(2) %> <%= order.currency %></dd>
+          <% } %>
+
+          <% const taxAmt = parseFloat(order.total_tax || 0); %>
+          <% if (taxAmt > 0) { %>
+          <dt>TVA</dt>
+          <dd><%= taxAmt.toFixed(2) %> <%= order.currency %></dd>
+          <% } %>
+
+          <dt>Total TTC</dt>
+          <dd><strong class="total-price"><%= parseFloat(order.total_price).toFixed(2) %> <%= order.currency %></strong></dd>
+        </dl>
+
+        <% if (order.note) { %>
+        <div class="note-box">
+          <strong>Note de commande :</strong><br>
+          <%= order.note %>
+        </div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Line items editing -->
+    <div class="card">
+      <h2 class="card-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+        Produits de la commande
+      </h2>
+      <p class="section-help">Modifiez les quantités ou ajoutez/supprimez des produits, puis cliquez sur <strong>Sauvegarder</strong> avant d'approuver.</p>
+
+      <form id="editForm" action="/commandes/<%= order.id %>/modifier" method="POST">
+        <div class="table-wrapper">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>SKU</th>
+                <th>Prix unitaire</th>
+                <th>Quantité</th>
+                <th>Sous-total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="lineItemsBody">
+              <% order.line_items.forEach(item => { %>
+              <tr class="line-item-row" data-item-id="<%= item.id %>" data-unit-price="<%= parseFloat(item.price) %>">
+                <td>
+                  <div class="product-name"><%= item.title %></div>
+                  <% if (item.variant_title && item.variant_title !== 'Default Title') { %>
+                  <div class="product-variant"><%= item.variant_title %></div>
+                  <% } %>
+                </td>
+                <td class="text-muted sku-cell"><%= item.sku || '—' %></td>
+                <td class="price-cell"><%= parseFloat(item.price).toFixed(2) %> <%= order.currency %></td>
+                <td>
+                  <input
+                    type="number"
+                    name="quantities[<%= item.id %>]"
+                    value="<%= item.quantity %>"
+                    min="1"
+                    max="9999"
+                    class="qty-input"
+                    data-price="<%= parseFloat(item.price) %>"
+                    data-currency="<%= order.currency %>"
+                  >
+                </td>
+                <td class="row-total price-cell">
+                  <%= (parseFloat(item.price) * item.quantity).toFixed(2) %> <%= order.currency %>
+                </td>
+                <td>
+                  <button type="button" class="btn-remove" data-item-id="<%= item.id %>">
+                    Supprimer
+                  </button>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Hidden fields for removed items (populated by JS) -->
+        <div id="removedItemsContainer"></div>
+
+        <!-- Staged new items (populated by JS) -->
+        <div id="newItemsContainer"></div>
+
+        <!-- Product search -->
+        <div class="search-section">
+          <h3 class="search-title">Ajouter un produit</h3>
+          <div class="search-row">
+            <input
+              type="text"
+              id="productSearchInput"
+              class="form-input search-input"
+              placeholder="Rechercher par nom de produit..."
+              autocomplete="off"
+            >
+            <button type="button" id="searchBtn" class="btn btn-secondary">Rechercher</button>
+          </div>
+          <div id="searchResultsBox" class="search-results-box hidden"></div>
+        </div>
+
+        <div class="form-actions-bar">
+          <button type="submit" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+            Sauvegarder les modifications
+          </button>
+          <a href="/tableau-de-bord" class="btn btn-ghost">Annuler</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Decision panel -->
+    <div class="card decision-card">
+      <h2 class="card-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14l-4-4 1.41-1.41L10 13.17l6.59-6.59L18 8l-8 8z"/></svg>
+        Décision
+      </h2>
+      <p class="decision-help">
+        Après avoir vérifié et éventuellement modifié la commande, prenez votre décision.
+        Une notification par email sera envoyée automatiquement.
+      </p>
+      <div class="decision-actions">
+        <form action="/commandes/<%= order.id %>/approuver" method="POST" style="display:inline-block">
+          <button
+            type="submit"
+            class="btn btn-approve"
+            onclick="return confirm('Confirmer l\'approbation de la commande #<%= order.order_number %> ?')"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Approuver la commande
+          </button>
+        </form>
+        <button type="button" class="btn btn-reject" id="openRejectBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          Refuser la commande
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Reject modal (native <dialog>) -->
+  <dialog id="rejectModal" class="modal">
+    <div class="modal-inner">
+      <h2 class="modal-title">Refuser la commande #<%= order.order_number %></h2>
+      <p class="modal-subtitle">Vous pouvez indiquer un motif qui sera enregistré dans la commande et envoyé par email.</p>
+      <form action="/commandes/<%= order.id %>/refuser" method="POST">
+        <div class="form-group">
+          <label for="rejectComment" class="form-label">Motif du refus <span class="optional">(optionnel)</span></label>
+          <textarea
+            id="rejectComment"
+            name="comment"
+            rows="4"
+            class="form-textarea"
+            placeholder="Ex : Produit en rupture de stock, quantité incorrecte, référence inconnue..."
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-reject">
+            Confirmer le refus
+          </button>
+          <button type="button" class="btn btn-ghost" id="closeRejectBtn">
+            Annuler
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <script>
+    const CURRENCY = '<%= order.currency %>';
+
+    // --- Quantity change handler ---
+    document.querySelectorAll('.qty-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const row = input.closest('tr');
+        const price = parseFloat(input.dataset.price);
+        const qty = Math.max(0, parseInt(input.value) || 0);
+        const totalCell = row.querySelector('.row-total');
+        totalCell.textContent = (price * qty).toFixed(2) + ' ' + CURRENCY;
+      });
+    });
+
+    // --- Remove line item ---
+    const removedContainer = document.getElementById('removedItemsContainer');
+
+    document.querySelectorAll('.btn-remove').forEach(btn => {
+      btn.addEventListener('click', () => toggleRemove(btn));
+    });
+
+    function toggleRemove(btn) {
+      const row = btn.closest('tr');
+      const itemId = btn.dataset.itemId;
+      const isRemoving = !row.classList.contains('removed-row');
+
+      if (isRemoving) {
+        row.classList.add('removed-row');
+        row.querySelectorAll('input').forEach(el => { el.disabled = true; });
+        btn.textContent = 'Annuler';
+
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'removed_items[]';
+        hidden.value = itemId;
+        hidden.id = `removed_hidden_${itemId}`;
+        removedContainer.appendChild(hidden);
+      } else {
+        row.classList.remove('removed-row');
+        row.querySelectorAll('input').forEach(el => { el.disabled = false; });
+        btn.textContent = 'Supprimer';
+
+        const hidden = document.getElementById(`removed_hidden_${itemId}`);
+        if (hidden) hidden.remove();
+      }
+    }
+
+    // --- Product search ---
+    let newItemCounter = 0;
+    const searchInput = document.getElementById('productSearchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const resultsBox = document.getElementById('searchResultsBox');
+    const newItemsContainer = document.getElementById('newItemsContainer');
+
+    async function performSearch() {
+      const q = searchInput.value.trim();
+      if (q.length < 2) {
+        resultsBox.classList.add('hidden');
+        return;
+      }
+      resultsBox.innerHTML = '<div class="search-loading">Recherche en cours...</div>';
+      resultsBox.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/produits/recherche?q=' + encodeURIComponent(q));
+        const products = await res.json();
+
+        if (!products.length) {
+          resultsBox.innerHTML = '<div class="search-empty">Aucun produit trouvé.</div>';
+          return;
+        }
+
+        resultsBox.innerHTML = products.map(p => {
+          const label = p.productTitle + (p.variantTitle ? ' — ' + p.variantTitle : '');
+          const meta = (p.sku ? 'SKU: ' + p.sku + ' · ' : '') + p.price + ' ' + CURRENCY;
+          return `<div class="search-result-item"
+                       data-variant-id="${p.variantId}"
+                       data-label="${escapeAttr(label)}"
+                       data-price="${p.price}">
+            <div class="result-name">${escapeHtml(label)}</div>
+            <div class="result-meta">${escapeHtml(meta)}</div>
+          </div>`;
+        }).join('');
+
+        resultsBox.querySelectorAll('.search-result-item').forEach(item => {
+          item.addEventListener('click', () => {
+            addNewProduct(
+              item.dataset.variantId,
+              item.dataset.label,
+              item.dataset.price
+            );
+          });
+        });
+      } catch (e) {
+        resultsBox.innerHTML = '<div class="search-error">Erreur lors de la recherche.</div>';
+      }
+    }
+
+    function addNewProduct(variantId, label, price) {
+      resultsBox.classList.add('hidden');
+      searchInput.value = '';
+
+      const id = `new_item_${++newItemCounter}`;
+      const div = document.createElement('div');
+      div.className = 'new-item-row';
+      div.id = id;
+      div.innerHTML = `
+        <input type="hidden" name="new_variants[]" value="${variantId}">
+        <div class="new-item-info">
+          <span class="new-item-name">${escapeHtml(label)}</span>
+          <span class="new-item-price">${price} ${CURRENCY}</span>
+        </div>
+        <div class="new-item-controls">
+          <label class="new-item-qty-label">Qté</label>
+          <input type="number" name="new_quantities[]" value="1" min="1" max="9999" class="qty-input">
+          <button type="button" class="btn-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+        </div>
+      `;
+      newItemsContainer.appendChild(div);
+    }
+
+    searchBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); performSearch(); }
+    });
+
+    // Close search results when clicking outside
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.search-section')) {
+        resultsBox.classList.add('hidden');
+      }
+    });
+
+    // --- Reject modal ---
+    const modal = document.getElementById('rejectModal');
+    document.getElementById('openRejectBtn').addEventListener('click', () => modal.showModal());
+    document.getElementById('closeRejectBtn').addEventListener('click', () => modal.close());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
+
+    // --- Utilities ---
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeAttr(str) {
+      if (str == null) return '';
+      return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>

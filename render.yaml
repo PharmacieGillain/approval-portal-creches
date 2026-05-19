@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: approval-portal-creches
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Shopify — à renseigner dans le dashboard Render
+      - key: SHOPIFY_SHOP
+        sync: false
+      - key: SHOPIFY_ACCESS_TOKEN
+        sync: false
+
+      # Portail — à renseigner dans le dashboard Render
+      - key: PORTAL_PASSWORD
+        sync: false
+
+      # Session — générée automatiquement par Render
+      - key: SESSION_SECRET
+        generateValue: true
+
+      # Email SMTP — optionnel, à renseigner dans le dashboard Render
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_SECURE
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: NOTIFICATION_EMAIL
+        sync: false

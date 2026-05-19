@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau de bord — Portail Mutterfirma</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="8" fill="#1e3a5f"/>
+        <path d="M24 10C16.27 10 10 16.27 10 24s6.27 14 14 14 14-6.27 14-14S31.73 10 24 10zm2 21h-4v-4h4v4zm0-8h-4V15h4v8z" fill="white"/>
+      </svg>
+      <span>Portail Mutterfirma</span>
+    </div>
+    <div class="navbar-links">
+      <a href="/tableau-de-bord" class="nav-link nav-link-active">Tableau de bord</a>
+      <a href="/historique" class="nav-link">Historique</a>
+      <a href="/deconnexion" class="nav-link">Déconnexion</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <% if (error) { %>
+      <div class="alert alert-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <%= error %>
+      </div>
+    <% } %>
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Commandes en attente</h1>
+        <p class="page-subtitle">Commandes nécessitant une validation de la Mutterfirma</p>
+      </div>
+      <div class="stats-badge">
+        <span class="stats-number"><%= orders.length %></span>
+        <span class="stats-label">en attente</span>
+      </div>
+    </div>
+
+    <% if (orders.length === 0) { %>
+      <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <h2>Aucune commande en attente</h2>
+        <p>Toutes les commandes ont été traitées.</p>
+      </div>
+    <% } else { %>
+      <div class="card">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Commande</th>
+              <th>Date</th>
+              <th>Établissement</th>
+              <th>Client</th>
+              <th>Produits</th>
+              <th>Total</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% orders.forEach(order => {
+              const company = getCompanyName(order);
+              const customer = getCustomerName(order);
+              const productSummary = order.line_items.slice(0, 3).map(item =>
+                `${item.title}${item.variant_title && item.variant_title !== 'Default Title' ? ' — ' + item.variant_title : ''} ×${item.quantity}`
+              );
+            %>
+            <tr class="order-row">
+              <td>
+                <span class="order-number">#<%= order.order_number %></span>
+              </td>
+              <td class="text-muted">
+                <%= formatDate(order.created_at) %>
+              </td>
+              <td>
+                <% if (company) { %>
+                  <strong class="company-name"><%= company %></strong>
+                <% } else { %>
+                  <span class="text-muted">—</span>
+                <% } %>
+              </td>
+              <td><%= customer %></td>
+              <td class="products-cell">
+                <% productSummary.forEach(p => { %>
+                  <div class="product-line"><%= p %></div>
+                <% }); %>
+                <% if (order.line_items.length > 3) { %>
+                  <div class="product-more">+ <%= order.line_items.length - 3 %> autre(s)</div>
+                <% } %>
+              </td>
+              <td class="price-cell">
+                <strong><%= parseFloat(order.total_price).toFixed(2) %> <%= order.currency %></strong>
+              </td>
+              <td>
+                <a href="/commandes/<%= order.id %>" class="btn btn-sm btn-primary">
+                  Examiner
+                </a>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>
