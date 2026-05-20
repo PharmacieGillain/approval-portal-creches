@@ -58,6 +58,7 @@
               <th>Date</th>
               <th>Établissement</th>
               <th>Client</th>
+              <th>Produits</th>
               <th>Total</th>
               <th>Statut</th>
               <th></th>
@@ -84,6 +85,17 @@
                 <% } %>
               </td>
               <td><%= customer %></td>
+              <td class="products-cell">
+                <% const productSummary = order.line_items.slice(0, 3).map(item =>
+                  `${item.title}${item.variant_title && item.variant_title !== 'Default Title' ? ' — ' + item.variant_title : ''} ×${item.quantity}`
+                ); %>
+                <% productSummary.forEach(p => { %>
+                  <div class="product-line"><%= p %></div>
+                <% }); %>
+                <% if (order.line_items.length > 3) { %>
+                  <div class="product-more">+ <%= order.line_items.length - 3 %> autre(s)</div>
+                <% } %>
+              </td>
               <td class="price-cell">
                 <strong><%= parseFloat(order.total_price).toFixed(2) %> <%= order.currency %></strong>
               </td>
