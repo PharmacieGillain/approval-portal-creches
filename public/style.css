@@ -269,6 +269,8 @@ body {
 .order-row:hover td { background: #f8faff; }
 
 .order-number { font-weight: 700; color: var(--primary); font-size: .95rem; }
+.client-filter-btn { background: none; border: none; padding: 0; cursor: pointer; color: inherit; font-size: inherit; font-family: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.client-filter-btn:hover { color: var(--primary); text-decoration: underline; }
 .company-name { color: var(--text); }
 .products-cell { max-width: 260px; }
 .product-line  { font-size: .85rem; color: var(--text); }
