@@ -212,26 +212,39 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14l-4-4 1.41-1.41L10 13.17l6.59-6.59L18 8l-8 8z"/></svg>
         Décision
       </h2>
-      <p class="decision-help">
-        Après avoir vérifié et éventuellement modifié la commande, prenez votre décision.
-        Une notification par email sera envoyée automatiquement.
-      </p>
-      <div class="decision-actions">
-        <form action="/commandes/<%= order.id %>/approuver" method="POST" style="display:inline-block">
-          <button
-            type="submit"
-            class="btn btn-approve"
-            onclick="return confirm('Confirmer l\'approbation de la commande #<%= order.order_number %> ?')"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-            Approuver la commande
+      <% const currentStatus = getOrderStatus(order); %>
+      <% if (currentStatus === 'validé') { %>
+        <div class="alert alert-success">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          ✅ Commande déjà validée
+        </div>
+      <% } else if (currentStatus === 'refusé') { %>
+        <div class="alert alert-error">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+          ❌ Commande refusée
+        </div>
+      <% } else { %>
+        <p class="decision-help">
+          Après avoir vérifié et éventuellement modifié la commande, prenez votre décision.
+          Une notification par email sera envoyée automatiquement.
+        </p>
+        <div class="decision-actions">
+          <form action="/commandes/<%= order.id %>/approuver" method="POST" style="display:inline-block">
+            <button
+              type="submit"
+              class="btn btn-approve"
+              onclick="return confirm('Confirmer l\'approbation de la commande #<%= order.order_number %> ?')"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              Approuver la commande
+            </button>
+          </form>
+          <button type="button" class="btn btn-reject" id="openRejectBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            Refuser la commande
           </button>
-        </form>
-        <button type="button" class="btn btn-reject" id="openRejectBtn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-          Refuser la commande
-        </button>
-      </div>
+        </div>
+      <% } %>
     </div>
   </main>
 
@@ -396,9 +409,12 @@
 
     // --- Reject modal ---
     const modal = document.getElementById('rejectModal');
-    document.getElementById('openRejectBtn').addEventListener('click', () => modal.showModal());
-    document.getElementById('closeRejectBtn').addEventListener('click', () => modal.close());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
+    const openRejectBtn = document.getElementById('openRejectBtn');
+    if (modal && openRejectBtn) {
+      openRejectBtn.addEventListener('click', () => modal.showModal());
+      document.getElementById('closeRejectBtn').addEventListener('click', () => modal.close());
+      modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });
+    }
 
     // --- Utilities ---
     function escapeHtml(str) {
