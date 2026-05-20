@@ -420,7 +420,7 @@ app.get('/api/produits/recherche', requireAuth, async (req, res) => {
 
     const data = await shopifyRest(
       'GET',
-      `products.json?title=${encodeURIComponent(q)}&limit=10&status=active`
+      `products.json?collection_id=644698014029&title=${encodeURIComponent(q)}&limit=10&status=active`
     );
 
     const results = [];
