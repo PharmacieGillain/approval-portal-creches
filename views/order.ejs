@@ -185,20 +185,15 @@
         <!-- Staged new items (populated by JS) -->
         <div id="newItemsContainer"></div>
 
-        <!-- Product search -->
+        <!-- Product browser -->
         <div class="search-section">
-          <h3 class="search-title">Ajouter un produit</h3>
-          <div class="search-row">
-            <input
-              type="text"
-              id="productSearchInput"
-              class="form-input search-input"
-              placeholder="Rechercher par nom de produit..."
-              autocomplete="off"
-            >
-            <button type="button" id="searchBtn" class="btn btn-secondary">Rechercher</button>
+          <button type="button" id="toggleProductsBtn" class="btn btn-secondary">+ Ajouter un produit</button>
+          <div id="productBrowserBox" class="search-results-box hidden">
+            <div class="search-row" style="padding:.75rem .75rem .5rem">
+              <input type="text" id="productFilterInput" class="form-input search-input" placeholder="Filtrer les produits..." autocomplete="off">
+            </div>
+            <div id="productList"><div class="search-loading">Chargement...</div></div>
           </div>
-          <div id="searchResultsBox" class="search-results-box hidden"></div>
         </div>
 
         <div class="form-actions-bar">
@@ -315,61 +310,71 @@
       }
     }
 
-    // --- Product search ---
+    // --- Product browser ---
+    let allProducts = null;
     let newItemCounter = 0;
-    const searchInput = document.getElementById('productSearchInput');
-    const searchBtn = document.getElementById('searchBtn');
-    const resultsBox = document.getElementById('searchResultsBox');
+    const toggleBtn = document.getElementById('toggleProductsBtn');
+    const browserBox = document.getElementById('productBrowserBox');
+    const filterInput = document.getElementById('productFilterInput');
+    const productList = document.getElementById('productList');
     const newItemsContainer = document.getElementById('newItemsContainer');
 
-    async function performSearch() {
-      const q = searchInput.value.trim();
-      if (q.length < 2) {
-        resultsBox.classList.add('hidden');
+    toggleBtn.addEventListener('click', async () => {
+      const isOpen = !browserBox.classList.contains('hidden');
+      if (isOpen) {
+        browserBox.classList.add('hidden');
         return;
       }
-      resultsBox.innerHTML = '<div class="search-loading">Recherche en cours...</div>';
-      resultsBox.classList.remove('hidden');
+      browserBox.classList.remove('hidden');
 
-      try {
-        const res = await fetch('/api/produits/recherche?q=' + encodeURIComponent(q));
-        const products = await res.json();
-
-        if (!products.length) {
-          resultsBox.innerHTML = '<div class="search-empty">Aucun produit trouvé.</div>';
+      if (allProducts === null) {
+        productList.innerHTML = '<div class="search-loading">Chargement des produits...</div>';
+        try {
+          const res = await fetch('/api/produits/collection');
+          allProducts = await res.json();
+        } catch (e) {
+          productList.innerHTML = '<div class="search-error">Erreur lors du chargement.</div>';
           return;
         }
+      }
+      renderProducts(allProducts);
+    });
 
-        resultsBox.innerHTML = products.map(p => {
-          const label = p.productTitle + (p.variantTitle ? ' — ' + p.variantTitle : '');
-          const meta = (p.sku ? 'SKU: ' + p.sku + ' · ' : '') + p.price + ' ' + CURRENCY;
-          return `<div class="search-result-item"
-                       data-variant-id="${p.variantId}"
-                       data-label="${escapeAttr(label)}"
-                       data-price="${p.price}">
+    filterInput.addEventListener('input', () => {
+      if (!allProducts) return;
+      const q = filterInput.value.toLowerCase();
+      const filtered = q
+        ? allProducts.filter(p =>
+            p.productTitle.toLowerCase().includes(q) ||
+            (p.variantTitle || '').toLowerCase().includes(q) ||
+            p.sku.toLowerCase().includes(q)
+          )
+        : allProducts;
+      renderProducts(filtered);
+    });
+
+    function renderProducts(products) {
+      if (!products.length) {
+        productList.innerHTML = '<div class="search-empty">Aucun produit trouvé.</div>';
+        return;
+      }
+      productList.innerHTML = products.map(p => {
+        const label = p.productTitle + (p.variantTitle ? ' — ' + p.variantTitle : '');
+        const meta = (p.sku ? 'SKU: ' + p.sku + ' · ' : '') + p.price + ' ' + CURRENCY;
+        return `<div class="search-result-item" style="display:flex;align-items:center;justify-content:space-between;gap:1rem">
+          <div>
             <div class="result-name">${escapeHtml(label)}</div>
             <div class="result-meta">${escapeHtml(meta)}</div>
-          </div>`;
-        }).join('');
-
-        resultsBox.querySelectorAll('.search-result-item').forEach(item => {
-          item.addEventListener('click', () => {
-            addNewProduct(
-              item.dataset.variantId,
-              item.dataset.label,
-              item.dataset.price
-            );
-          });
-        });
-      } catch (e) {
-        resultsBox.innerHTML = '<div class="search-error">Erreur lors de la recherche.</div>';
-      }
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" style="flex-shrink:0"
+            onclick="addNewProduct('${p.variantId}','${escapeAttr(label)}','${p.price}')">
+            Ajouter
+          </button>
+        </div>`;
+      }).join('');
     }
 
     function addNewProduct(variantId, label, price) {
-      resultsBox.classList.add('hidden');
-      searchInput.value = '';
-
       const id = `new_item_${++newItemCounter}`;
       const div = document.createElement('div');
       div.className = 'new-item-row';
@@ -388,18 +393,6 @@
       `;
       newItemsContainer.appendChild(div);
     }
-
-    searchBtn.addEventListener('click', performSearch);
-    searchInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); performSearch(); }
-    });
-
-    // Close search results when clicking outside
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.search-section')) {
-        resultsBox.classList.add('hidden');
-      }
-    });
 
     // --- Reject modal ---
     const modal = document.getElementById('rejectModal');

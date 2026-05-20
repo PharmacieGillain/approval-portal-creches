@@ -412,6 +412,32 @@ app.post('/commandes/:id/refuser', requireAuth, async (req, res) => {
   }
 });
 
+// All products in collection (AJAX — initial load)
+app.get('/api/produits/collection', requireAuth, async (req, res) => {
+  try {
+    const data = await shopifyRest(
+      'GET',
+      'products.json?collection_id=644698014029&limit=250&status=active'
+    );
+    const results = [];
+    for (const product of data.products || []) {
+      for (const variant of product.variants) {
+        results.push({
+          variantId: variant.id,
+          productTitle: product.title,
+          variantTitle: variant.title !== 'Default Title' ? variant.title : null,
+          price: parseFloat(variant.price).toFixed(2),
+          sku: variant.sku || '',
+        });
+      }
+    }
+    res.json(results);
+  } catch (e) {
+    console.error('Collection products error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Product search API (AJAX)
 app.get('/api/produits/recherche', requireAuth, async (req, res) => {
   try {
