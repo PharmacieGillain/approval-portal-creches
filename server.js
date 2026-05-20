@@ -306,7 +306,7 @@ app.post('/commandes/:id/modifier', requireAuth, async (req, res) => {
       const qty = Math.max(1, parseInt(newQtysArr[i]) || 1);
       await shopifyGQL(
         `mutation addVariant($id: ID!, $variantId: ID!, $qty: Int!) {
-          orderEditAddVariantLineItem(id: $id, variantId: $variantId, quantity: $qty) {
+          orderEditAddVariant(id: $id, variantId: $variantId, quantity: $qty, allowDuplicates: true) {
             calculatedOrder { id }
             userErrors { message }
           }
