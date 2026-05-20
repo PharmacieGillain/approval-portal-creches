@@ -317,7 +317,7 @@ app.post('/commandes/:id/modifier', requireAuth, async (req, res) => {
 
     const commitRes = await shopifyGQL(
       `mutation commit($id: ID!) {
-        orderEditCommit(id: $id, notifyCustomer: false, staffNote: "Modifié via le Portail Approbation Mutterfirma") {
+        orderEditCommit(id: $id, notifyCustomer: false, staffNote: "Modifié via le Portail Crèches") {
           order { id }
           userErrors { message }
         }
@@ -348,14 +348,14 @@ app.post('/commandes/:id/approuver', requireAuth, async (req, res) => {
       `Commande #${order.order_number} approuvée — ${company || name}`,
       `<div style="font-family:Arial,sans-serif;max-width:600px;padding:20px">
         <h2 style="color:#16a34a;border-bottom:2px solid #16a34a;padding-bottom:10px">✅ Commande approuvée</h2>
-        <p>La commande <strong>#${order.order_number}</strong> a été <strong>approuvée</strong> par la Mutterfirma.</p>
+        <p>La commande <strong>#${order.order_number}</strong> a été <strong>approuvée</strong> par le Portail Crèches.</p>
         <table style="width:100%;border-collapse:collapse;margin:20px 0">
           <tr style="background:#f0fdf4"><td style="padding:10px;font-weight:bold;width:40%">Client</td><td style="padding:10px">${name}</td></tr>
           ${company ? `<tr><td style="padding:10px;font-weight:bold">Établissement</td><td style="padding:10px">${company}</td></tr>` : ''}
           <tr style="background:#f0fdf4"><td style="padding:10px;font-weight:bold">Total</td><td style="padding:10px">${parseFloat(order.total_price).toFixed(2)} ${order.currency}</td></tr>
           <tr><td style="padding:10px;font-weight:bold">Date</td><td style="padding:10px">${formatDate(order.created_at)}</td></tr>
         </table>
-        <p style="color:#666;font-size:12px;border-top:1px solid #eee;padding-top:10px">Portail Approbation Crèches — Mutterfirma</p>
+        <p style="color:#666;font-size:12px;border-top:1px solid #eee;padding-top:10px">Portail Crèches</p>
       </div>`
     );
 
@@ -392,7 +392,7 @@ app.post('/commandes/:id/refuser', requireAuth, async (req, res) => {
       `Commande #${order.order_number} refusée — ${company || name}`,
       `<div style="font-family:Arial,sans-serif;max-width:600px;padding:20px">
         <h2 style="color:#dc2626;border-bottom:2px solid #dc2626;padding-bottom:10px">❌ Commande refusée</h2>
-        <p>La commande <strong>#${order.order_number}</strong> a été <strong>refusée</strong> par la Mutterfirma.</p>
+        <p>La commande <strong>#${order.order_number}</strong> a été <strong>refusée</strong> par le Portail Crèches.</p>
         <table style="width:100%;border-collapse:collapse;margin:20px 0">
           <tr style="background:#fef2f2"><td style="padding:10px;font-weight:bold;width:40%">Client</td><td style="padding:10px">${name}</td></tr>
           ${company ? `<tr><td style="padding:10px;font-weight:bold">Établissement</td><td style="padding:10px">${company}</td></tr>` : ''}
@@ -400,7 +400,7 @@ app.post('/commandes/:id/refuser', requireAuth, async (req, res) => {
           <tr><td style="padding:10px;font-weight:bold">Date</td><td style="padding:10px">${formatDate(order.created_at)}</td></tr>
           ${comment ? `<tr style="background:#fef2f2"><td style="padding:10px;font-weight:bold;color:#dc2626">Motif du refus</td><td style="padding:10px;color:#dc2626">${comment}</td></tr>` : ''}
         </table>
-        <p style="color:#666;font-size:12px;border-top:1px solid #eee;padding-top:10px">Portail Approbation Crèches — Mutterfirma</p>
+        <p style="color:#666;font-size:12px;border-top:1px solid #eee;padding-top:10px">Portail Crèches</p>
       </div>`
     );
 
