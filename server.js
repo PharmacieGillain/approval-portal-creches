@@ -1,3 +1,4 @@
+// Portail Crèches — v1.1.0 — includes crèche self-registration, login, ordering, and admin management
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
