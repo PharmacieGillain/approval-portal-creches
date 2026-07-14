@@ -39,9 +39,15 @@
         <h1 class="page-title">Commandes en attente</h1>
         <p class="page-subtitle">Commandes nécessitant une validation du Portail Crèches</p>
       </div>
-      <div class="stats-badge">
-        <span class="stats-number"><%= orders.length %></span>
-        <span class="stats-label">en attente</span>
+      <div style="display:flex;gap:.75rem;align-items:center">
+        <div class="stats-badge">
+          <span class="stats-number"><%= orders.length %></span>
+          <span class="stats-label">Shopify</span>
+        </div>
+        <a href="/admin/commandes-creches" class="stats-badge" style="text-decoration:none;background:<%= pendingCrecheCount > 0 ? '#15803d' : 'var(--primary)' %>">
+          <span class="stats-number"><%= pendingCrecheCount %></span>
+          <span class="stats-label">Crèches</span>
+        </a>
       </div>
     </div>
 

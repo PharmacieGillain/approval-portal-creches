@@ -260,17 +260,19 @@ app.get('/historique', requireAuth, async (req, res) => {
 
 // Dashboard — list pending orders
 app.get('/tableau-de-bord', requireAuth, async (req, res) => {
+  const pendingCrecheCount = readJson(ORDERS_FILE).filter(o => o.status === 'en_attente').length;
   try {
     const data = await shopifyRest(
       'GET',
       'orders.json?tag=en-attente-validation&status=any&limit=250'
     );
-    res.render('dashboard', { orders: data.orders || [], error: null });
+    res.render('dashboard', { orders: data.orders || [], error: null, pendingCrecheCount });
   } catch (e) {
     console.error('Dashboard error:', e.message);
     res.render('dashboard', {
       orders: [],
       error: 'Impossible de charger les commandes. Vérifiez la configuration Shopify.',
+      pendingCrecheCount,
     });
   }
 });
