@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion des crèches — Portail Crèches</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="8" fill="#1e3a5f"/>
+        <path d="M24 10C16.27 10 10 16.27 10 24s6.27 14 14 14 14-6.27 14-14S31.73 10 24 10zm2 21h-4v-4h4v4zm0-8h-4V15h4v8z" fill="white"/>
+      </svg>
+      <span>Portail Crèches</span>
+    </div>
+    <div class="navbar-links">
+      <a href="/tableau-de-bord" class="nav-link">Tableau de bord</a>
+      <a href="/historique" class="nav-link">Historique</a>
+      <span style="width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 .15rem;display:inline-block;vertical-align:middle"></span>
+      <a href="/admin/creches" class="nav-link nav-link-active">Crèches</a>
+      <a href="/admin/commandes-creches" class="nav-link">Commandes crèches</a>
+      <span style="width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 .15rem;display:inline-block;vertical-align:middle"></span>
+      <a href="/deconnexion" class="nav-link">Déconnexion</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <% if (error) { %>
+      <div class="alert alert-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <%= error %>
+      </div>
+    <% } %>
+    <% if (success) { %>
+      <div class="alert alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <%= success %>
+      </div>
+    <% } %>
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Gestion des crèches</h1>
+        <p class="page-subtitle">Approuvez ou refusez les demandes d'inscription des établissements</p>
+      </div>
+      <div class="stats-badge">
+        <span class="stats-number"><%= creches.filter(c => c.status === 'pending_approval').length %></span>
+        <span class="stats-label">en attente</span>
+      </div>
+    </div>
+
+    <% if (creches.length === 0) { %>
+      <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+        </svg>
+        <h2>Aucun établissement inscrit</h2>
+        <p>Les demandes d'inscription apparaîtront ici.</p>
+      </div>
+    <% } else { %>
+      <div class="card">
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th>Établissement</th>
+              <th>Contact</th>
+              <th>Email</th>
+              <th>Téléphone</th>
+              <th>Adresse</th>
+              <th>Date d'inscription</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% creches.forEach(creche => { %>
+            <tr class="order-row">
+              <td><strong class="company-name"><%= creche.name %></strong></td>
+              <td><%= creche.contact %></td>
+              <td>
+                <a href="mailto:<%= creche.email %>" class="link"><%= creche.email %></a>
+              </td>
+              <td class="text-muted"><%= creche.phone || '—' %></td>
+              <td class="text-muted" style="max-width:180px;font-size:.85rem"><%= creche.address %></td>
+              <td class="text-muted"><%= formatDate(creche.createdAt) %></td>
+              <td>
+                <% if (creche.status === 'approved') { %>
+                  <span class="badge badge-success">Approuvée</span>
+                <% } else if (creche.status === 'rejected') { %>
+                  <span class="badge badge-danger">Refusée</span>
+                <% } else { %>
+                  <span class="badge badge-pending">En attente</span>
+                <% } %>
+              </td>
+              <td>
+                <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+                  <% if (creche.status !== 'approved') { %>
+                  <form method="POST" action="/admin/creches/<%= creche.id %>/approuver" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-approve"
+                      onclick="return confirm('Approuver l\'accès à <%= creche.name %> ?')">
+                      Approuver
+                    </button>
+                  </form>
+                  <% } %>
+                  <% if (creche.status !== 'rejected') { %>
+                  <form method="POST" action="/admin/creches/<%= creche.id %>/rejeter" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-reject"
+                      onclick="return confirm('Refuser l\'accès à <%= creche.name %> ?')">
+                      Refuser
+                    </button>
+                  </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

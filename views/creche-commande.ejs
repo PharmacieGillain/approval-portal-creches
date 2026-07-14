@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passer une commande — Portail Crèches</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="8" fill="#1e3a5f"/>
+        <path d="M24 10C16.27 10 10 16.27 10 24s6.27 14 14 14 14-6.27 14-14S31.73 10 24 10zm2 21h-4v-4h4v4zm0-8h-4V15h4v8z" fill="white"/>
+      </svg>
+      <span>Portail Crèches</span>
+    </div>
+    <div class="navbar-links">
+      <span style="color:rgba(255,255,255,.7);font-size:.85rem;padding:.35rem .5rem"><%= crecheName %></span>
+      <a href="/creche/deconnexion" class="nav-link">Déconnexion</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <% if (error) { %>
+      <div class="alert alert-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <%= error %>
+      </div>
+    <% } %>
+    <% if (success) { %>
+      <div class="alert alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <%= success %>
+      </div>
+    <% } %>
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Passer une commande</h1>
+        <p class="page-subtitle">Sélectionnez les produits et les quantités souhaitées, puis envoyez votre commande à l'enseigne.</p>
+      </div>
+      <div class="stats-badge" id="selectionBadge" style="display:none">
+        <span class="stats-number" id="selectionCount">0</span>
+        <span class="stats-label">produit(s)</span>
+      </div>
+    </div>
+
+    <% if (products.length === 0 && !error) { %>
+      <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+          <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+          <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+        </svg>
+        <h2>Aucun produit disponible</h2>
+        <p>Le catalogue produits est vide ou inaccessible.</p>
+      </div>
+    <% } else if (products.length > 0) { %>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--text-muted)"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="productFilter" class="form-input" placeholder="Filtrer les produits par nom ou SKU..." style="margin:0;max-width:420px" autocomplete="off">
+        <span id="filterCount" style="font-size:.85rem;color:var(--text-muted);white-space:nowrap"><%= products.length %> produit(s)</span>
+      </div>
+    </div>
+
+    <form method="POST" action="/creche/commande" id="orderForm">
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrapper">
+          <table class="orders-table" id="productsTable">
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>Variante</th>
+                <th>SKU</th>
+                <th>Prix unit.</th>
+                <th style="width:120px">Quantité</th>
+              </tr>
+            </thead>
+            <tbody id="productsTbody">
+              <% products.forEach(p => { %>
+              <tr class="order-row product-row" data-search="<%= (p.productTitle + ' ' + (p.variantTitle || '') + ' ' + p.sku).toLowerCase().replace(/"/g, '') %>">
+                <td>
+                  <div class="product-name"><%= p.productTitle %></div>
+                </td>
+                <td class="text-muted">
+                  <% if (p.variantTitle) { %><%= p.variantTitle %><% } else { %>—<% } %>
+                </td>
+                <td class="text-muted sku-cell"><%= p.sku || '—' %></td>
+                <td class="price-cell"><strong><%= p.price %> EUR</strong></td>
+                <td>
+                  <input type="hidden" name="ptitle[<%= p.variantId %>]" value="<%= p.productTitle %>">
+                  <input type="hidden" name="pvtitle[<%= p.variantId %>]" value="<%= p.variantTitle || '' %>">
+                  <input type="hidden" name="pprice[<%= p.variantId %>]" value="<%= p.price %>">
+                  <input type="hidden" name="psku[<%= p.variantId %>]" value="<%= p.sku %>">
+                  <input
+                    type="number"
+                    name="qty[<%= p.variantId %>]"
+                    value="0"
+                    min="0"
+                    max="9999"
+                    class="qty-input product-qty"
+                    data-price="<%= p.price %>"
+                  >
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card decision-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+          <div>
+            <div id="orderSummaryText" style="font-size:.9rem;color:var(--text-muted)">
+              Sélectionnez des produits pour composer votre commande.
+            </div>
+            <div id="orderTotal" style="font-size:1.1rem;font-weight:700;color:var(--primary);margin-top:.3rem;display:none"></div>
+          </div>
+          <button type="submit" class="btn btn-approve" id="submitBtn" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            Envoyer la commande à l'enseigne
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <% } %>
+  </main>
+
+  <script>
+    const filterInput = document.getElementById('productFilter');
+    const filterCount = document.getElementById('filterCount');
+    const rows = Array.from(document.querySelectorAll('.product-row'));
+    const submitBtn = document.getElementById('submitBtn');
+    const selectionBadge = document.getElementById('selectionBadge');
+    const selectionCount = document.getElementById('selectionCount');
+    const orderSummaryText = document.getElementById('orderSummaryText');
+    const orderTotal = document.getElementById('orderTotal');
+
+    // Filter products by text
+    if (filterInput) {
+      filterInput.addEventListener('input', () => {
+        const q = filterInput.value.toLowerCase();
+        let visible = 0;
+        rows.forEach(row => {
+          const match = !q || row.dataset.search.includes(q);
+          row.style.display = match ? '' : 'none';
+          if (match) visible++;
+        });
+        if (filterCount) filterCount.textContent = visible + ' produit(s)';
+      });
+    }
+
+    // Update order summary when quantities change
+    function updateSummary() {
+      let totalItems = 0;
+      let totalPrice = 0;
+      document.querySelectorAll('.product-qty').forEach(input => {
+        const qty = parseInt(input.value) || 0;
+        if (qty > 0) {
+          totalItems += 1;
+          totalPrice += parseFloat(input.dataset.price) * qty;
+        }
+      });
+
+      if (totalItems > 0) {
+        submitBtn.disabled = false;
+        selectionBadge.style.display = 'block';
+        selectionCount.textContent = totalItems;
+        orderSummaryText.textContent = totalItems + ' référence(s) sélectionnée(s)';
+        orderTotal.textContent = 'Total estimé : ' + totalPrice.toFixed(2) + ' EUR';
+        orderTotal.style.display = 'block';
+      } else {
+        submitBtn.disabled = true;
+        selectionBadge.style.display = 'none';
+        orderSummaryText.textContent = 'Sélectionnez des produits pour composer votre commande.';
+        orderTotal.style.display = 'none';
+      }
+    }
+
+    document.querySelectorAll('.product-qty').forEach(input => {
+      input.addEventListener('input', updateSummary);
+    });
+
+    // Confirm before submit
+    document.getElementById('orderForm') && document.getElementById('orderForm').addEventListener('submit', (e) => {
+      let totalItems = 0;
+      document.querySelectorAll('.product-qty').forEach(input => {
+        if ((parseInt(input.value) || 0) > 0) totalItems++;
+      });
+      if (totalItems === 0) {
+        e.preventDefault();
+        return;
+      }
+      if (!confirm('Confirmer l\'envoi de la commande à l\'enseigne ?')) {
+        e.preventDefault();
+      }
+    });
+  </script>
+</body>
+</html>

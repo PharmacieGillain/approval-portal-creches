@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inscription — Portail Crèches</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-body">
+  <div class="login-container" style="max-width:500px">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="12" fill="#1e3a5f"/>
+            <path d="M24 10C16.27 10 10 16.27 10 24s6.27 14 14 14 14-6.27 14-14S31.73 10 24 10zm2 21h-4v-4h4v4zm0-8h-4V15h4v8z" fill="white"/>
+          </svg>
+        </div>
+        <h1 class="login-title">Portail Crèches</h1>
+        <p class="login-subtitle">Créer un compte établissement</p>
+      </div>
+
+      <% if (error) { %>
+        <div class="alert alert-error">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+          <%= error %>
+        </div>
+      <% } %>
+      <% if (success) { %>
+        <div class="alert alert-success">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <%= success %>
+        </div>
+      <% } %>
+
+      <% if (!success) { %>
+      <form method="POST" action="/creche/register" class="login-form">
+        <div class="form-group">
+          <label for="name" class="form-label">Nom de l'établissement <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="name" name="name" class="form-input" placeholder="Ex : Crèche Les Petits Pas" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="contact" class="form-label">Personne de contact <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="contact" name="contact" class="form-input" placeholder="Prénom et nom" required>
+        </div>
+        <div class="form-group">
+          <label for="email" class="form-label">Email <span style="color:var(--danger)">*</span></label>
+          <input type="email" id="email" name="email" class="form-input" placeholder="contact@etablissement.be" required>
+        </div>
+        <div class="form-group">
+          <label for="password" class="form-label">Mot de passe <span style="color:var(--danger)">*</span></label>
+          <input type="password" id="password" name="password" class="form-input" placeholder="Minimum 8 caractères" minlength="8" required>
+        </div>
+        <div class="form-group">
+          <label for="phone" class="form-label">Téléphone <span class="optional">(optionnel)</span></label>
+          <input type="tel" id="phone" name="phone" class="form-input" placeholder="Ex : 04 xx xx xx xx">
+        </div>
+        <div class="form-group">
+          <label for="address" class="form-label">Adresse <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="address" name="address" class="form-input" placeholder="Rue, numéro, ville" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">
+          Envoyer ma demande d'inscription
+        </button>
+      </form>
+      <% } %>
+
+      <p style="text-align:center;margin-top:1.25rem;font-size:.85rem;color:var(--text-muted)">
+        Déjà inscrit(e) ? <a href="/creche/login" class="link">Se connecter</a>
+      </p>
+    </div>
+    <p class="login-footer">Portail Crèches — Espace établissements</p>
+  </div>
+</body>
+</html>

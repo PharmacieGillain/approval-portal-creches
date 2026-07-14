@@ -4,6 +4,9 @@ const session = require('express-session');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -107,6 +110,63 @@ async function updateOrderTags(orderId, removeTag, addTag) {
   return order;
 }
 
+// --- DB helpers ---
+
+const DB_DIR = path.join(__dirname, 'db');
+const CRECHES_FILE = path.join(DB_DIR, 'creches.json');
+const ORDERS_FILE = path.join(DB_DIR, 'pending-orders.json');
+
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+if (!fs.existsSync(CRECHES_FILE)) fs.writeFileSync(CRECHES_FILE, '[]', 'utf8');
+if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, '[]', 'utf8');
+
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch { return []; }
+}
+
+function writeJson(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+}
+
+// --- Shopify order creation for crèche orders ---
+
+async function createShopifyOrderForCreche(pendingOrder, creche) {
+  const nameParts = (creche.contact || '').split(' ');
+  const firstName = nameParts[0] || creche.name;
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  const line_items = pendingOrder.items.map(item => ({
+    variant_id: parseInt(item.variantId),
+    quantity: item.quantity,
+  }));
+
+  const addrBase = {
+    first_name: firstName,
+    last_name: lastName,
+    company: creche.name,
+    address1: creche.address || '',
+    phone: creche.phone || '',
+    country_code: 'BE',
+  };
+
+  const data = await shopifyRest('POST', 'orders.json', {
+    order: {
+      line_items,
+      customer: { first_name: firstName, last_name: lastName, email: creche.email },
+      billing_address: addrBase,
+      shipping_address: addrBase,
+      tags: 'validé, commande-creche',
+      financial_status: 'pending',
+      send_receipt: false,
+      send_fulfillment_receipt: false,
+      inventory_behaviour: 'bypass',
+      note: `Commande Portail Crèches — ${creche.name}`,
+    },
+  });
+  return data.order;
+}
+
 // --- Express setup ---
 
 app.set('view engine', 'ejs');
@@ -136,7 +196,14 @@ const requireAuth = (req, res, next) => {
   res.redirect('/login');
 };
 
-// --- Routes ---
+const requireCrecheAuth = (req, res, next) => {
+  if (req.session.crecheId) return next();
+  res.redirect('/creche/login');
+};
+
+// ================================================================
+// EXISTING ADMIN ROUTES
+// ================================================================
 
 app.get('/', (req, res) => res.redirect('/tableau-de-bord'));
 
@@ -468,7 +535,299 @@ app.get('/api/produits/recherche', requireAuth, async (req, res) => {
   }
 });
 
+// ================================================================
+// CRÈCHE SELF-SERVICE PORTAL
+// ================================================================
 
+// --- Registration ---
+
+app.get('/creche/register', (req, res) => {
+  if (req.session.crecheId) return res.redirect('/creche/commande');
+  res.render('creche-register', { error: null, success: null });
+});
+
+app.post('/creche/register', async (req, res) => {
+  const { name, contact, email, password, phone, address } = req.body;
+
+  if (!name || !contact || !email || !password || !address) {
+    return res.render('creche-register', {
+      error: 'Veuillez remplir tous les champs obligatoires.',
+      success: null,
+    });
+  }
+
+  const creches = readJson(CRECHES_FILE);
+  if (creches.find(c => c.email.toLowerCase() === email.toLowerCase())) {
+    return res.render('creche-register', {
+      error: 'Un compte avec cette adresse email existe déjà.',
+      success: null,
+    });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const newCreche = {
+    id: crypto.randomUUID(),
+    name: name.trim(),
+    contact: contact.trim(),
+    email: email.trim().toLowerCase(),
+    password: hashedPassword,
+    phone: (phone || '').trim(),
+    address: address.trim(),
+    status: 'pending_approval',
+    createdAt: new Date().toISOString(),
+  };
+
+  creches.push(newCreche);
+  writeJson(CRECHES_FILE, creches);
+
+  res.render('creche-register', {
+    error: null,
+    success: 'Votre compte est en attente de validation par l\'enseigne. Vous recevrez une confirmation dès que votre accès sera activé.',
+  });
+});
+
+// --- Login ---
+
+app.get('/creche/login', (req, res) => {
+  if (req.session.crecheId) return res.redirect('/creche/commande');
+  res.render('creche-login', { error: null });
+});
+
+app.post('/creche/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.render('creche-login', { error: 'Veuillez remplir tous les champs.' });
+  }
+
+  const creches = readJson(CRECHES_FILE);
+  const creche = creches.find(c => c.email === email.trim().toLowerCase());
+
+  if (!creche || !(await bcrypt.compare(password, creche.password))) {
+    return res.render('creche-login', { error: 'Email ou mot de passe incorrect.' });
+  }
+
+  if (creche.status === 'pending_approval') {
+    return res.render('creche-login', {
+      error: 'Votre compte n\'est pas encore approuvé par l\'enseigne. Veuillez patienter.',
+    });
+  }
+
+  if (creche.status === 'rejected') {
+    return res.render('creche-login', {
+      error: 'Votre demande d\'accès a été refusée. Veuillez contacter l\'enseigne.',
+    });
+  }
+
+  req.session.crecheId = creche.id;
+  req.session.crecheName = creche.name;
+  res.redirect('/creche/commande');
+});
+
+app.get('/creche/deconnexion', requireCrecheAuth, (req, res) => {
+  req.session.destroy(() => res.redirect('/creche/login'));
+});
+
+// --- Order page ---
+
+app.get('/creche/commande', requireCrecheAuth, async (req, res) => {
+  const flash = req.session.flash || {};
+  delete req.session.flash;
+
+  try {
+    const data = await shopifyRest(
+      'GET',
+      'products.json?collection_id=644698014029&limit=250&status=active'
+    );
+    const products = [];
+    for (const product of data.products || []) {
+      for (const variant of product.variants) {
+        products.push({
+          variantId: String(variant.id),
+          productTitle: product.title,
+          variantTitle: variant.title !== 'Default Title' ? variant.title : null,
+          price: parseFloat(variant.price).toFixed(2),
+          sku: variant.sku || '',
+        });
+      }
+    }
+
+    res.render('creche-commande', {
+      products,
+      crecheName: req.session.crecheName,
+      error: flash.error || null,
+      success: flash.success || null,
+    });
+  } catch (e) {
+    console.error('Creche commande load error:', e.message);
+    res.render('creche-commande', {
+      products: [],
+      crecheName: req.session.crecheName,
+      error: 'Impossible de charger les produits. Veuillez réessayer.',
+      success: null,
+    });
+  }
+});
+
+app.post('/creche/commande', requireCrecheAuth, async (req, res) => {
+  const { qty, ptitle, pvtitle, pprice, psku } = req.body;
+
+  const items = [];
+  if (qty && typeof qty === 'object') {
+    for (const [variantId, quantity] of Object.entries(qty)) {
+      const qtyNum = parseInt(quantity) || 0;
+      if (qtyNum > 0) {
+        items.push({
+          variantId,
+          productTitle: (ptitle && ptitle[variantId]) || '',
+          variantTitle: (pvtitle && pvtitle[variantId]) || null,
+          price: (pprice && pprice[variantId]) || '0',
+          sku: (psku && psku[variantId]) || '',
+          quantity: qtyNum,
+        });
+      }
+    }
+  }
+
+  if (items.length === 0) {
+    req.session.flash = { error: 'Veuillez sélectionner au moins un produit.' };
+    return res.redirect('/creche/commande');
+  }
+
+  const total = items
+    .reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0)
+    .toFixed(2);
+
+  const order = {
+    id: crypto.randomUUID(),
+    crecheId: req.session.crecheId,
+    crecheName: req.session.crecheName,
+    items,
+    total,
+    status: 'en_attente',
+    createdAt: new Date().toISOString(),
+    rejectionReason: null,
+    shopifyOrderId: null,
+    shopifyOrderNumber: null,
+  };
+
+  const orders = readJson(ORDERS_FILE);
+  orders.push(order);
+  writeJson(ORDERS_FILE, orders);
+
+  req.session.flash = {
+    success: 'Votre commande a été envoyée à l\'enseigne pour validation.',
+  };
+  res.redirect('/creche/commande');
+});
+
+// ================================================================
+// ADMIN — CRÈCHE MANAGEMENT
+// ================================================================
+
+app.get('/admin/creches', requireAuth, (req, res) => {
+  const flash = req.session.flash || {};
+  delete req.session.flash;
+  const creches = readJson(CRECHES_FILE);
+  creches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.render('admin-creches', {
+    creches,
+    error: flash.error || null,
+    success: flash.success || null,
+  });
+});
+
+app.post('/admin/creches/:id/approuver', requireAuth, (req, res) => {
+  const creches = readJson(CRECHES_FILE);
+  const idx = creches.findIndex(c => c.id === req.params.id);
+  if (idx !== -1) {
+    creches[idx].status = 'approved';
+    writeJson(CRECHES_FILE, creches);
+    req.session.flash = { success: `Crèche "${creches[idx].name}" approuvée.` };
+  }
+  res.redirect('/admin/creches');
+});
+
+app.post('/admin/creches/:id/rejeter', requireAuth, (req, res) => {
+  const creches = readJson(CRECHES_FILE);
+  const idx = creches.findIndex(c => c.id === req.params.id);
+  if (idx !== -1) {
+    creches[idx].status = 'rejected';
+    writeJson(CRECHES_FILE, creches);
+    req.session.flash = { success: `Crèche "${creches[idx].name}" refusée.` };
+  }
+  res.redirect('/admin/creches');
+});
+
+// ================================================================
+// ADMIN — CRÈCHE ORDERS MANAGEMENT
+// ================================================================
+
+app.get('/admin/commandes-creches', requireAuth, (req, res) => {
+  const flash = req.session.flash || {};
+  delete req.session.flash;
+  const orders = readJson(ORDERS_FILE);
+  orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.render('admin-commandes-creches', {
+    orders,
+    error: flash.error || null,
+    success: flash.success || null,
+  });
+});
+
+app.post('/admin/commandes-creches/:id/approuver', requireAuth, async (req, res) => {
+  const orders = readJson(ORDERS_FILE);
+  const idx = orders.findIndex(o => o.id === req.params.id);
+
+  if (idx === -1) {
+    req.session.flash = { error: 'Commande introuvable.' };
+    return res.redirect('/admin/commandes-creches');
+  }
+
+  const order = orders[idx];
+  const creches = readJson(CRECHES_FILE);
+  const creche = creches.find(c => c.id === order.crecheId);
+
+  if (!creche) {
+    req.session.flash = { error: 'Crèche associée à cette commande introuvable.' };
+    return res.redirect('/admin/commandes-creches');
+  }
+
+  try {
+    const shopifyOrder = await createShopifyOrderForCreche(order, creche);
+    orders[idx].status = 'approuvee';
+    orders[idx].shopifyOrderId = String(shopifyOrder.id);
+    orders[idx].shopifyOrderNumber = shopifyOrder.order_number;
+    writeJson(ORDERS_FILE, orders);
+    req.session.flash = {
+      success: `Commande de ${order.crecheName} approuvée — commande Shopify #${shopifyOrder.order_number} créée.`,
+    };
+  } catch (e) {
+    console.error('Shopify order creation error:', e.message);
+    req.session.flash = {
+      error: `Erreur lors de la création de la commande Shopify : ${e.message}`,
+    };
+  }
+
+  res.redirect('/admin/commandes-creches');
+});
+
+app.post('/admin/commandes-creches/:id/rejeter', requireAuth, (req, res) => {
+  const { reason } = req.body;
+  const orders = readJson(ORDERS_FILE);
+  const idx = orders.findIndex(o => o.id === req.params.id);
+
+  if (idx !== -1) {
+    orders[idx].status = 'rejetee';
+    orders[idx].rejectionReason = (reason || '').trim() || null;
+    writeJson(ORDERS_FILE, orders);
+    req.session.flash = { success: `Commande de ${orders[idx].crecheName} refusée.` };
+  }
+
+  res.redirect('/admin/commandes-creches');
+});
+
+// ================================================================
 
 app.listen(PORT, () => {
   console.log(`Portail Approbation Crèches démarré sur http://localhost:${PORT}`);

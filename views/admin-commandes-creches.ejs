@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commandes crèches — Portail Crèches</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="8" fill="#1e3a5f"/>
+        <path d="M24 10C16.27 10 10 16.27 10 24s6.27 14 14 14 14-6.27 14-14S31.73 10 24 10zm2 21h-4v-4h4v4zm0-8h-4V15h4v8z" fill="white"/>
+      </svg>
+      <span>Portail Crèches</span>
+    </div>
+    <div class="navbar-links">
+      <a href="/tableau-de-bord" class="nav-link">Tableau de bord</a>
+      <a href="/historique" class="nav-link">Historique</a>
+      <span style="width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 .15rem;display:inline-block;vertical-align:middle"></span>
+      <a href="/admin/creches" class="nav-link">Crèches</a>
+      <a href="/admin/commandes-creches" class="nav-link nav-link-active">Commandes crèches</a>
+      <span style="width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 .15rem;display:inline-block;vertical-align:middle"></span>
+      <a href="/deconnexion" class="nav-link">Déconnexion</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <% if (error) { %>
+      <div class="alert alert-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <%= error %>
+      </div>
+    <% } %>
+    <% if (success) { %>
+      <div class="alert alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <%= success %>
+      </div>
+    <% } %>
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Commandes des crèches</h1>
+        <p class="page-subtitle">Validez ou refusez les commandes soumises par les établissements</p>
+      </div>
+      <div class="stats-badge">
+        <span class="stats-number"><%= orders.filter(o => o.status === 'en_attente').length %></span>
+        <span class="stats-label">en attente</span>
+      </div>
+    </div>
+
+    <% if (orders.length === 0) { %>
+      <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <h2>Aucune commande reçue</h2>
+        <p>Les commandes des établissements apparaîtront ici.</p>
+      </div>
+    <% } else { %>
+      <% orders.forEach(order => { %>
+      <div class="card" style="margin-bottom:1.25rem">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+          <div>
+            <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+              <strong class="company-name" style="font-size:1.05rem"><%= order.crecheName %></strong>
+              <% if (order.status === 'approuvee') { %>
+                <span class="badge badge-success">Approuvée</span>
+              <% } else if (order.status === 'rejetee') { %>
+                <span class="badge badge-danger">Refusée</span>
+              <% } else { %>
+                <span class="badge badge-pending">En attente</span>
+              <% } %>
+            </div>
+            <div class="text-muted" style="font-size:.85rem;margin-top:.25rem">
+              Reçue le <%= formatDateTime(order.createdAt) %>
+              <% if (order.shopifyOrderNumber) { %>
+                · Commande Shopify <strong>#<%= order.shopifyOrderNumber %></strong> créée
+              <% } %>
+              <% if (order.rejectionReason) { %>
+                · <span style="color:var(--danger)">Motif : <%= order.rejectionReason %></span>
+              <% } %>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:1.2rem;font-weight:700;color:var(--primary)"><%= parseFloat(order.total).toFixed(2) %> EUR</div>
+            <div class="text-muted" style="font-size:.8rem"><%= order.items.length %> référence(s)</div>
+          </div>
+        </div>
+
+        <!-- Product lines -->
+        <div class="table-wrapper" style="margin-bottom:1rem">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>Variante</th>
+                <th>SKU</th>
+                <th>Prix unit.</th>
+                <th>Qté</th>
+                <th>Sous-total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% order.items.forEach(item => { %>
+              <tr>
+                <td><div class="product-name"><%= item.productTitle %></div></td>
+                <td class="text-muted">
+                  <% if (item.variantTitle) { %><%= item.variantTitle %><% } else { %>—<% } %>
+                </td>
+                <td class="text-muted sku-cell"><%= item.sku || '—' %></td>
+                <td class="price-cell"><%= parseFloat(item.price).toFixed(2) %> EUR</td>
+                <td><strong><%= item.quantity %></strong></td>
+                <td class="price-cell"><strong><%= (parseFloat(item.price) * item.quantity).toFixed(2) %> EUR</strong></td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Actions (only for pending orders) -->
+        <% if (order.status === 'en_attente') { %>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;padding-top:.75rem;border-top:1px solid var(--border)">
+          <form method="POST" action="/admin/commandes-creches/<%= order.id %>/approuver">
+            <button type="submit" class="btn btn-approve"
+              onclick="return confirm('Approuver la commande de <%= order.crecheName %> et créer la commande Shopify ?')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+              Approuver et créer la commande Shopify
+            </button>
+          </form>
+          <button type="button" class="btn btn-reject" onclick="document.getElementById('rejectForm-<%= order.id %>').style.display='block';this.style.display='none'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            Refuser
+          </button>
+          <form method="POST" action="/admin/commandes-creches/<%= order.id %>/rejeter" id="rejectForm-<%= order.id %>" style="display:none;width:100%">
+            <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+              <input type="text" name="reason" class="form-input" placeholder="Motif du refus (optionnel)" style="flex:1;min-width:200px;margin:0">
+              <button type="submit" class="btn btn-reject">Confirmer le refus</button>
+              <button type="button" class="btn btn-ghost" onclick="this.closest('form').style.display='none';this.closest('div').previousElementSibling.previousElementSibling.nextElementSibling.style.display=''">Annuler</button>
+            </div>
+          </form>
+        </div>
+        <% } %>
+      </div>
+      <% }); %>
+    <% } %>
+  </main>
+</body>
+</html>
