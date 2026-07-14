@@ -85,8 +85,11 @@
             </div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:1.2rem;font-weight:700;color:var(--primary)"><%= parseFloat(order.total).toFixed(2) %> EUR</div>
-            <div class="text-muted" style="font-size:.8rem"><%= order.items.length %> référence(s)</div>
+            <% const totalNet = (parseFloat(order.total) * (1 - discountRate)).toFixed(2); %>
+            <div style="font-size:1.2rem;font-weight:700;color:var(--primary)"><%= totalNet %> EUR</div>
+            <div class="text-muted" style="font-size:.75rem;text-decoration:line-through"><%= parseFloat(order.total).toFixed(2) %> EUR</div>
+            <div style="font-size:.75rem;color:var(--success);font-weight:600">-<%= Math.round(discountRate * 100) %>% remise crèches</div>
+            <div class="text-muted" style="font-size:.8rem;margin-top:.2rem"><%= order.items.length %> référence(s)</div>
           </div>
         </div>
 
@@ -98,31 +101,38 @@
                 <th>Produit</th>
                 <th>Variante</th>
                 <th>SKU</th>
-                <th>Prix unit.</th>
+                <th>Prix cat.</th>
+                <th>Prix net (-<%= Math.round(discountRate * 100) %>%)</th>
                 <th>Qté</th>
-                <th>Sous-total</th>
+                <th>Sous-total net</th>
               </tr>
             </thead>
             <tbody>
               <% order.items.forEach(item => { %>
+              <% const netPrice = (parseFloat(item.price) * (1 - discountRate)).toFixed(2); %>
               <tr>
                 <td><div class="product-name"><%= item.productTitle %></div></td>
                 <td class="text-muted">
                   <% if (item.variantTitle) { %><%= item.variantTitle %><% } else { %>—<% } %>
                 </td>
                 <td class="text-muted sku-cell"><%= item.sku || '—' %></td>
-                <td class="price-cell"><%= parseFloat(item.price).toFixed(2) %> EUR</td>
+                <td class="price-cell text-muted" style="text-decoration:line-through"><%= parseFloat(item.price).toFixed(2) %></td>
+                <td class="price-cell" style="color:var(--success);font-weight:600"><%= netPrice %> EUR</td>
                 <td><strong><%= item.quantity %></strong></td>
-                <td class="price-cell"><strong><%= (parseFloat(item.price) * item.quantity).toFixed(2) %> EUR</strong></td>
+                <td class="price-cell"><strong><%= (parseFloat(netPrice) * item.quantity).toFixed(2) %> EUR</strong></td>
               </tr>
               <% }); %>
             </tbody>
           </table>
         </div>
 
-        <!-- Actions (only for pending orders) -->
-        <% if (order.status === 'en_attente') { %>
+        <!-- Actions -->
         <div style="display:flex;gap:.75rem;flex-wrap:wrap;padding-top:.75rem;border-top:1px solid var(--border)">
+          <a href="/admin/commandes-creches/<%= order.id %>/facture" target="_blank" class="btn btn-secondary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+            Imprimer la facture
+          </a>
+        <% if (order.status === 'en_attente') { %>
           <form method="POST" action="/admin/commandes-creches/<%= order.id %>/approuver">
             <button type="submit" class="btn btn-approve"
               onclick="return confirm('Approuver la commande de <%= order.crecheName %> et créer la commande Shopify ?')">
@@ -143,6 +153,7 @@
           </form>
         </div>
         <% } %>
+        </div>
       </div>
       <% }); %>
     <% } %>

@@ -184,8 +184,18 @@
             <!-- Filled state -->
             <div id="summaryFilled" style="display:none">
               <div id="summaryItemsList"></div>
+              <div style="margin-top:.5rem;padding-top:.75rem;border-top:1px solid var(--border);font-size:.875rem;display:flex;flex-direction:column;gap:.35rem">
+                <div style="display:flex;justify-content:space-between;color:var(--text-muted)">
+                  <span>Sous-total catalogue</span>
+                  <span id="summarySubtotal">0.00 EUR</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;color:var(--success);font-weight:600">
+                  <span>Remise crèches (<%= Math.round(discountRate * 100) %>%)</span>
+                  <span id="summaryDiscount">-0.00 EUR</span>
+                </div>
+              </div>
               <div class="summary-total-line">
-                <span style="font-weight:600;color:var(--text)">Total estimé</span>
+                <span style="font-weight:600;color:var(--text)">Total après remise</span>
                 <strong style="font-size:1.15rem;color:var(--primary)" id="summaryTotal">0.00 EUR</strong>
               </div>
             </div>
@@ -206,13 +216,16 @@
   </main>
 
   <script>
+    const DISCOUNT_RATE = <%= discountRate %>;
     const filterInput  = document.getElementById('productFilter');
     const filterCount  = document.getElementById('filterCount');
     const submitBtn    = document.getElementById('submitBtn');
-    const summaryEmpty  = document.getElementById('summaryEmpty');
-    const summaryFilled = document.getElementById('summaryFilled');
-    const summaryList   = document.getElementById('summaryItemsList');
-    const summaryTotal  = document.getElementById('summaryTotal');
+    const summaryEmpty    = document.getElementById('summaryEmpty');
+    const summaryFilled   = document.getElementById('summaryFilled');
+    const summaryList     = document.getElementById('summaryItemsList');
+    const summarySubtotal = document.getElementById('summarySubtotal');
+    const summaryDiscount = document.getElementById('summaryDiscount');
+    const summaryTotal    = document.getElementById('summaryTotal');
     const rows = Array.from(document.querySelectorAll('.product-row'));
 
     // --- Filter ---
@@ -267,20 +280,28 @@
       summaryFilled.style.display = '';
       submitBtn.disabled = false;
 
-      summaryList.innerHTML = selected.map(item => `
+      const discount = total * DISCOUNT_RATE;
+      const totalAfterDiscount = total - discount;
+
+      summaryList.innerHTML = selected.map(item => {
+        const netPrice = item.price * (1 - DISCOUNT_RATE);
+        const netSubtotal = netPrice * item.qty;
+        return `
         <div class="summary-item">
           <div class="summary-item-name">
             <strong>${escHtml(item.name)}</strong>
             ${item.variant ? `<span>${escHtml(item.variant)}</span>` : ''}
           </div>
           <div class="summary-item-right">
-            <div class="summary-item-qty">${item.qty} × ${item.price.toFixed(2)}</div>
-            <div class="summary-item-subtotal">${item.subtotal.toFixed(2)} EUR</div>
+            <div class="summary-item-qty">${item.qty} × ${netPrice.toFixed(2)}</div>
+            <div class="summary-item-subtotal">${netSubtotal.toFixed(2)} EUR</div>
           </div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
 
-      summaryTotal.textContent = total.toFixed(2) + ' EUR';
+      summarySubtotal.textContent = total.toFixed(2) + ' EUR';
+      summaryDiscount.textContent = '-' + discount.toFixed(2) + ' EUR';
+      summaryTotal.textContent = totalAfterDiscount.toFixed(2) + ' EUR';
     }
 
     document.querySelectorAll('.product-qty').forEach(input => {

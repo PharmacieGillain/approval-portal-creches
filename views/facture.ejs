@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Facture — <%= order.crecheName %></title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #f0f0f0;
+    }
+
+    /* --- Print toolbar (hidden on print) --- */
+    .print-toolbar {
+      background: #1e3a5f;
+      color: white;
+      padding: .75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .print-toolbar a { color: rgba(255,255,255,.85); text-decoration: none; font-size: .875rem; }
+    .print-toolbar a:hover { color: white; }
+    .btn-print {
+      background: #16a34a;
+      color: white;
+      border: none;
+      padding: .5rem 1.25rem;
+      border-radius: 6px;
+      font-size: .875rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .btn-print:hover { background: #15803d; }
+
+    /* --- Invoice page --- */
+    .invoice-wrapper {
+      max-width: 800px;
+      margin: 1.5rem auto;
+      background: white;
+      box-shadow: 0 4px 24px rgba(0,0,0,.12);
+      border-radius: 4px;
+    }
+
+    .invoice-page {
+      padding: 2.5rem 3rem;
+    }
+
+    /* Header */
+    .inv-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 3px solid #1e3a5f;
+    }
+    .inv-pharmacy-name {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin-bottom: .2rem;
+    }
+    .inv-pharmacy-sub { color: #64748b; font-size: .85rem; }
+    .inv-title-block { text-align: right; }
+    .inv-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1e3a5f;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .inv-number { font-size: .9rem; color: #64748b; margin-top: .2rem; }
+    .inv-date   { font-size: .9rem; color: #1a1a1a; font-weight: 600; }
+
+    /* Status banner for approved orders */
+    .inv-status-banner {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 4px;
+      padding: .6rem 1rem;
+      color: #16a34a;
+      font-weight: 600;
+      font-size: .85rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    /* Addresses */
+    .inv-addresses {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .inv-address-block h3 {
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: #64748b;
+      margin-bottom: .5rem;
+      padding-bottom: .3rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .inv-address-block p { line-height: 1.7; color: #1a1a1a; }
+    .inv-address-block strong { color: #1e3a5f; }
+
+    /* Items table */
+    .inv-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+    }
+    .inv-table thead tr {
+      background: #1e3a5f;
+      color: white;
+    }
+    .inv-table th {
+      padding: .65rem .85rem;
+      text-align: left;
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+    .inv-table th:last-child,
+    .inv-table td:last-child { text-align: right; }
+    .inv-table th:nth-child(4),
+    .inv-table th:nth-child(5),
+    .inv-table th:nth-child(6) { text-align: right; }
+    .inv-table td {
+      padding: .6rem .85rem;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    .inv-table td:nth-child(4),
+    .inv-table td:nth-child(5),
+    .inv-table td:nth-child(6) { text-align: right; white-space: nowrap; }
+    .inv-table tbody tr:nth-child(even) { background: #fafbfc; }
+    .inv-table tbody tr:last-child td { border-bottom: none; }
+    .inv-item-name { font-weight: 600; color: #1a1a1a; }
+    .inv-item-variant { font-size: .8rem; color: #64748b; }
+    .inv-price-original { color: #94a3b8; text-decoration: line-through; font-size: .85rem; }
+    .inv-price-net { color: #16a34a; font-weight: 700; }
+
+    /* Totals */
+    .inv-totals {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 2rem;
+    }
+    .inv-totals-box {
+      width: 280px;
+    }
+    .inv-totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: .45rem 0;
+      font-size: .9rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .inv-totals-row:last-child { border-bottom: none; }
+    .inv-totals-label { color: #64748b; }
+    .inv-totals-value { font-weight: 600; }
+    .inv-totals-discount { color: #16a34a; }
+    .inv-totals-final {
+      display: flex;
+      justify-content: space-between;
+      padding: .75rem 0 .35rem;
+      border-top: 2px solid #1e3a5f;
+      margin-top: .25rem;
+    }
+    .inv-totals-final-label { font-size: 1rem; font-weight: 700; color: #1e3a5f; }
+    .inv-totals-final-value { font-size: 1.2rem; font-weight: 700; color: #1e3a5f; }
+
+    /* Footer */
+    .inv-footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      color: #64748b;
+      font-size: .8rem;
+      line-height: 1.6;
+    }
+    .inv-footer-note { max-width: 340px; }
+
+    /* Print styles */
+    @media print {
+      body { background: white; }
+      .print-toolbar { display: none !important; }
+      .invoice-wrapper { margin: 0; box-shadow: none; border-radius: 0; }
+      .invoice-page { padding: 1.5cm 2cm; }
+      .inv-table tbody tr:nth-child(even) { background: #f8f8f8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .inv-table thead tr { background: #1e3a5f !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    @page { size: A4; margin: 0; }
+  </style>
+</head>
+<body>
+
+  <!-- Toolbar (hidden on print) -->
+  <div class="print-toolbar">
+    <a href="/admin/commandes-creches">← Retour aux commandes</a>
+    <button class="btn-print" onclick="window.print()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+      Imprimer / Enregistrer en PDF
+    </button>
+  </div>
+
+  <%
+    const subtotalBrut = order.items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+    const remiseAmt    = subtotalBrut * discountRate;
+    const totalNet     = subtotalBrut - remiseAmt;
+    const invoiceDate  = new Date(order.createdAt);
+    const invoiceDateFr = invoiceDate.toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' });
+    const d = invoiceDate;
+    const invoiceNum = 'FA-' + d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + '-' + order.id.slice(-6).toUpperCase();
+  %>
+
+  <div class="invoice-wrapper">
+    <div class="invoice-page">
+
+      <!-- Header -->
+      <div class="inv-header">
+        <div>
+          <div class="inv-pharmacy-name"><%= pharmacyName %></div>
+          <div class="inv-pharmacy-sub">Fournisseur officiel — Portail Crèches</div>
+        </div>
+        <div class="inv-title-block">
+          <div class="inv-title">Facture</div>
+          <div class="inv-number">N° <%= invoiceNum %></div>
+          <div class="inv-date">Date : <%= invoiceDateFr %></div>
+          <% if (order.shopifyOrderNumber) { %>
+          <div style="margin-top:.25rem;font-size:.8rem;color:#64748b">Commande Shopify #<%= order.shopifyOrderNumber %></div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Status banner -->
+      <% if (order.status === 'approuvee') { %>
+      <div class="inv-status-banner">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Commande approuvée — Shopify #<%= order.shopifyOrderNumber %>
+      </div>
+      <% } else if (order.status === 'en_attente') { %>
+      <div class="inv-status-banner" style="background:#fffbeb;border-color:#fde68a;color:#92400e">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        Commande en attente de validation
+      </div>
+      <% } %>
+
+      <!-- Addresses -->
+      <div class="inv-addresses">
+        <div class="inv-address-block">
+          <h3>Fournisseur</h3>
+          <p><strong><%= pharmacyName %></strong><br>Portail Crèches</p>
+        </div>
+        <div class="inv-address-block">
+          <h3>Facturer à</h3>
+          <p>
+            <strong><%= order.crecheName %></strong><br>
+            <% if (creche) { %>
+              <%= creche.contact %><br>
+              <%= creche.address %><br>
+              <% if (creche.phone) { %><%= creche.phone %><br><% } %>
+              <%= creche.email %>
+            <% } %>
+          </p>
+        </div>
+      </div>
+
+      <!-- Items table -->
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th>Désignation</th>
+            <th>SKU</th>
+            <th style="text-align:right">Prix cat.</th>
+            <th style="text-align:right">Remise</th>
+            <th style="text-align:right">Prix net</th>
+            <th style="text-align:right">Qté</th>
+            <th style="text-align:right">Sous-total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% order.items.forEach(item => {
+            const priceBrut = parseFloat(item.price);
+            const priceNet  = priceBrut * (1 - discountRate);
+            const lineTotal = priceNet * item.quantity;
+          %>
+          <tr>
+            <td>
+              <div class="inv-item-name"><%= item.productTitle %></div>
+              <% if (item.variantTitle) { %><div class="inv-item-variant"><%= item.variantTitle %></div><% } %>
+            </td>
+            <td style="color:#64748b;font-size:.82rem;font-family:monospace"><%= item.sku || '—' %></td>
+            <td class="inv-price-original"><%= priceBrut.toFixed(2) %> EUR</td>
+            <td style="color:#16a34a;text-align:right;font-size:.85rem">−<%= Math.round(discountRate * 100) %>%</td>
+            <td class="inv-price-net"><%= priceNet.toFixed(2) %> EUR</td>
+            <td style="text-align:right"><strong><%= item.quantity %></strong></td>
+            <td style="text-align:right;font-weight:600"><%= lineTotal.toFixed(2) %> EUR</td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+
+      <!-- Totals -->
+      <div class="inv-totals">
+        <div class="inv-totals-box">
+          <div class="inv-totals-row">
+            <span class="inv-totals-label">Sous-total catalogue</span>
+            <span class="inv-totals-value"><%= subtotalBrut.toFixed(2) %> EUR</span>
+          </div>
+          <div class="inv-totals-row inv-totals-discount">
+            <span>Remise crèches (<%= Math.round(discountRate * 100) %>%)</span>
+            <span>− <%= remiseAmt.toFixed(2) %> EUR</span>
+          </div>
+          <div class="inv-totals-final">
+            <span class="inv-totals-final-label">Total TTC</span>
+            <span class="inv-totals-final-value"><%= totalNet.toFixed(2) %> EUR</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="inv-footer">
+        <div class="inv-footer-note">
+          <strong>Conditions de paiement :</strong> Paiement à réception de facture.<br>
+          Remise crèches de <%= Math.round(discountRate * 100) %>% accordée sur l'ensemble des produits.
+        </div>
+        <div style="text-align:right">
+          Généré le <%= new Date().toLocaleDateString('fr-FR') %> via le Portail Crèches
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

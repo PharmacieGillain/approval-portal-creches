@@ -111,6 +111,10 @@ async function updateOrderTags(orderId, removeTag, addTag) {
   return order;
 }
 
+// --- Crèche discount ---
+
+const CRECHE_DISCOUNT_RATE = 0.10; // 10% applied to all crèche Shopify orders
+
 // --- DB helpers ---
 
 const DB_DIR = path.join(__dirname, 'db');
@@ -140,6 +144,7 @@ async function createShopifyOrderForCreche(pendingOrder, creche) {
   const line_items = pendingOrder.items.map(item => ({
     variant_id: parseInt(item.variantId),
     quantity: item.quantity,
+    price: (parseFloat(item.price) * (1 - CRECHE_DISCOUNT_RATE)).toFixed(2),
   }));
 
   const addrBase = {
@@ -658,6 +663,7 @@ app.get('/creche/commande', requireCrecheAuth, async (req, res) => {
     res.render('creche-commande', {
       products,
       crecheName: req.session.crecheName,
+      discountRate: CRECHE_DISCOUNT_RATE,
       error: flash.error || null,
       success: flash.success || null,
     });
@@ -666,6 +672,7 @@ app.get('/creche/commande', requireCrecheAuth, async (req, res) => {
     res.render('creche-commande', {
       products: [],
       crecheName: req.session.crecheName,
+      discountRate: CRECHE_DISCOUNT_RATE,
       error: 'Impossible de charger les produits. Veuillez réessayer.',
       success: null,
     });
@@ -773,8 +780,23 @@ app.get('/admin/commandes-creches', requireAuth, (req, res) => {
   orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.render('admin-commandes-creches', {
     orders,
+    discountRate: CRECHE_DISCOUNT_RATE,
     error: flash.error || null,
     success: flash.success || null,
+  });
+});
+
+app.get('/admin/commandes-creches/:id/facture', requireAuth, (req, res) => {
+  const orders = readJson(ORDERS_FILE);
+  const order = orders.find(o => o.id === req.params.id);
+  if (!order) return res.redirect('/admin/commandes-creches');
+  const creches = readJson(CRECHES_FILE);
+  const creche = creches.find(c => c.id === order.crecheId) || null;
+  res.render('facture', {
+    order,
+    creche,
+    discountRate: CRECHE_DISCOUNT_RATE,
+    pharmacyName: process.env.PHARMACY_NAME || 'Pharmacie Gillain',
   });
 });
 
