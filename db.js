@@ -4,49 +4,78 @@
 
 const { Pool } = require('pg');
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.DATABASE_URL && process.env.NODE_ENV === 'production'
-      ? { rejectUnauthorized: false }
-      : false,
-});
+// The pool is only created once DATABASE_URL is confirmed present (see init()),
+// so a missing/unreachable database never triggers a stray connection attempt
+// to a bogus default (localhost:5432).
+let pool = null;
+let available = false;
+
+function isAvailable() {
+  return available;
+}
+
+// Defense in depth: every exported query function calls this first, so even
+// a route that forgets to check db.isAvailable() fails fast with a clear
+// message instead of hanging on a connection that was never established.
+function assertAvailable() {
+  if (!available) {
+    throw new Error('Base de données indisponible (DATABASE_URL non configuré ou connexion impossible).');
+  }
+}
 
 async function init() {
   if (!process.env.DATABASE_URL) {
-    throw new Error(
-      'DATABASE_URL manquant. Ajoutez une base PostgreSQL et définissez DATABASE_URL (voir SETUP.md).'
+    console.warn(
+      'DATABASE_URL non défini : démarrage sans base de données. ' +
+      'Le portail crèche self-service (inscription, connexion, commandes) est désactivé. Voir SETUP.md.'
     );
+    available = false;
+    return false;
   }
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS creches (
-      id UUID PRIMARY KEY,
-      name TEXT NOT NULL,
-      contact TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      phone TEXT,
-      address TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending_approval',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-  `);
+  try {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    });
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pending_orders (
-      id UUID PRIMARY KEY,
-      creche_id UUID NOT NULL REFERENCES creches(id),
-      creche_name TEXT NOT NULL,
-      items JSONB NOT NULL,
-      total NUMERIC(10,2) NOT NULL,
-      status TEXT NOT NULL DEFAULT 'en_attente',
-      rejection_reason TEXT,
-      shopify_order_id TEXT,
-      shopify_order_number TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-  `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS creches (
+        id UUID PRIMARY KEY,
+        name TEXT NOT NULL,
+        contact TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        phone TEXT,
+        address TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending_approval',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pending_orders (
+        id UUID PRIMARY KEY,
+        creche_id UUID NOT NULL REFERENCES creches(id),
+        creche_name TEXT NOT NULL,
+        items JSONB NOT NULL,
+        total NUMERIC(10,2) NOT NULL,
+        status TEXT NOT NULL DEFAULT 'en_attente',
+        rejection_reason TEXT,
+        shopify_order_id TEXT,
+        shopify_order_number TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `);
+
+    available = true;
+    console.log('Base de données PostgreSQL connectée — tables vérifiées/créées.');
+    return true;
+  } catch (e) {
+    console.error('Erreur de connexion à la base de données :', e.message || e.code || e);
+    available = false;
+    return false;
+  }
 }
 
 // --- Row <-> app object mapping ---
@@ -100,21 +129,25 @@ async function queryTolerantToBadUuid(sql, params) {
 // --- Crèches ---
 
 async function getAllCreches() {
+  assertAvailable();
   const { rows } = await pool.query('SELECT * FROM creches');
   return rows.map(mapCreche);
 }
 
 async function getCrecheById(id) {
+  assertAvailable();
   const { rows } = await queryTolerantToBadUuid('SELECT * FROM creches WHERE id = $1', [id]);
   return mapCreche(rows[0]);
 }
 
 async function getCrecheByEmail(email) {
+  assertAvailable();
   const { rows } = await pool.query('SELECT * FROM creches WHERE email = $1', [email]);
   return mapCreche(rows[0]);
 }
 
 async function createCreche({ id, name, contact, email, passwordHash, phone, address, status, createdAt }) {
+  assertAvailable();
   const { rows } = await pool.query(
     `INSERT INTO creches (id, name, contact, email, password_hash, phone, address, status, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
@@ -124,6 +157,7 @@ async function createCreche({ id, name, contact, email, passwordHash, phone, add
 }
 
 async function updateCrecheStatus(id, status) {
+  assertAvailable();
   const { rows } = await queryTolerantToBadUuid(
     'UPDATE creches SET status = $1 WHERE id = $2 RETURNING *',
     [status, id]
@@ -134,16 +168,19 @@ async function updateCrecheStatus(id, status) {
 // --- Pending orders (crèche self-service orders) ---
 
 async function getAllOrders() {
+  assertAvailable();
   const { rows } = await pool.query('SELECT * FROM pending_orders');
   return rows.map(mapOrder);
 }
 
 async function getOrderById(id) {
+  assertAvailable();
   const { rows } = await queryTolerantToBadUuid('SELECT * FROM pending_orders WHERE id = $1', [id]);
   return mapOrder(rows[0]);
 }
 
 async function createOrder({ id, crecheId, crecheName, items, total, status, createdAt }) {
+  assertAvailable();
   const { rows } = await pool.query(
     `INSERT INTO pending_orders (id, creche_id, creche_name, items, total, status, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -153,6 +190,7 @@ async function createOrder({ id, crecheId, crecheName, items, total, status, cre
 }
 
 async function approveOrder(id, shopifyOrderId, shopifyOrderNumber) {
+  assertAvailable();
   const { rows } = await queryTolerantToBadUuid(
     `UPDATE pending_orders
      SET status = 'approuvee', shopify_order_id = $1, shopify_order_number = $2
@@ -163,6 +201,7 @@ async function approveOrder(id, shopifyOrderId, shopifyOrderNumber) {
 }
 
 async function rejectOrder(id, reason) {
+  assertAvailable();
   const { rows } = await queryTolerantToBadUuid(
     `UPDATE pending_orders
      SET status = 'rejetee', rejection_reason = $1
@@ -173,8 +212,8 @@ async function rejectOrder(id, reason) {
 }
 
 module.exports = {
-  pool,
   init,
+  isAvailable,
   getAllCreches,
   getCrecheById,
   getCrecheByEmail,

@@ -25,14 +25,23 @@ services:
       - key: SESSION_SECRET
         generateValue: true
 
-      # Base de données — OBLIGATOIRE, à créer manuellement dans le dashboard Render :
-      # New +  →  PostgreSQL  →  plan Free  →  puis copier son "Internal Database URL"
-      # dans la variable DATABASE_URL de ce service (dashboard Render → Environment).
-      # Voir SETUP.md pour la marche à suivre complète.
-      # Le stockage sur disque local (db/*.json) est éphémère sur le plan free
-      # de Render : il est réinitialisé à chaque redéploiement/redémarrage.
+      # Base de données — voir la section `databases:` ci-dessous.
+      # Sans DATABASE_URL, le serveur démarre quand même mais en mode dégradé :
+      # le portail crèche self-service (inscription/connexion/commandes) est
+      # désactivé (le reste — tableau de bord, historique, approbation des
+      # commandes Shopify — fonctionne normalement, ces routes n'utilisent pas
+      # la base). Le stockage sur disque local (db/*.json) est éphémère sur le
+      # plan free de Render : il est réinitialisé à chaque redéploiement.
+      #
+      # Si ce service a été déployé via "New Blueprint" à partir de ce repo,
+      # DATABASE_URL est rempli automatiquement (fromDatabase ci-dessous).
+      # S'il a été créé manuellement (New Web Service), ajoutez la base
+      # vous-même dans le dashboard Render puis collez son "Internal Database
+      # URL" ici. Voir SETUP.md pour la marche à suivre complète.
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: approval-portal-creches-db
+          property: connectionString
 
       # Email SMTP — optionnel, à renseigner dans le dashboard Render
       - key: SMTP_HOST
@@ -49,3 +58,9 @@ services:
         sync: false
       - key: NOTIFICATION_EMAIL
         sync: false
+
+databases:
+  - name: approval-portal-creches-db
+    plan: free
+    databaseName: approval_portal_creches
+    user: approval_portal_creches

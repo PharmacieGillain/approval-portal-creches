@@ -247,10 +247,12 @@ app.get('/historique', requireAuth, async (req, res) => {
 // Dashboard — list pending orders
 app.get('/tableau-de-bord', requireAuth, async (req, res) => {
   let pendingCrecheCount = 0;
-  try {
-    pendingCrecheCount = (await db.getAllOrders()).filter(o => o.status === 'en_attente').length;
-  } catch (e) {
-    console.error('Pending crèche count error:', e.message);
+  if (db.isAvailable()) {
+    try {
+      pendingCrecheCount = (await db.getAllOrders()).filter(o => o.status === 'en_attente').length;
+    } catch (e) {
+      console.error('Pending crèche count error:', e.message);
+    }
   }
   try {
     const data = await shopifyRest(
@@ -535,12 +537,22 @@ app.get('/api/produits/recherche', requireAuth, async (req, res) => {
 
 // --- Registration ---
 
+const DB_UNAVAILABLE_MESSAGE =
+  'Ce service est temporairement indisponible (base de données non configurée). Veuillez réessayer plus tard.';
+
 app.get('/creche/register', (req, res) => {
   if (req.session.crecheId) return res.redirect('/creche/commande');
-  res.render('creche-register', { error: null, success: null });
+  res.render('creche-register', {
+    error: db.isAvailable() ? null : DB_UNAVAILABLE_MESSAGE,
+    success: null,
+  });
 });
 
 app.post('/creche/register', async (req, res) => {
+  if (!db.isAvailable()) {
+    return res.render('creche-register', { error: DB_UNAVAILABLE_MESSAGE, success: null });
+  }
+
   const { name, contact, email, password, phone, address } = req.body;
 
   if (!name || !contact || !email || !password || !address) {
@@ -581,10 +593,14 @@ app.post('/creche/register', async (req, res) => {
 
 app.get('/creche/login', (req, res) => {
   if (req.session.crecheId) return res.redirect('/creche/commande');
-  res.render('creche-login', { error: null });
+  res.render('creche-login', { error: db.isAvailable() ? null : DB_UNAVAILABLE_MESSAGE });
 });
 
 app.post('/creche/login', async (req, res) => {
+  if (!db.isAvailable()) {
+    return res.render('creche-login', { error: DB_UNAVAILABLE_MESSAGE });
+  }
+
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -662,6 +678,11 @@ app.get('/creche/commande', requireCrecheAuth, async (req, res) => {
 });
 
 app.post('/creche/commande', requireCrecheAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect('/creche/commande');
+  }
+
   const { qty, ptitle, pvtitle, pprice, psku } = req.body;
 
   const items = [];
@@ -713,6 +734,11 @@ app.post('/creche/commande', requireCrecheAuth, async (req, res) => {
 app.get('/admin/creches', requireAuth, async (req, res) => {
   const flash = req.session.flash || {};
   delete req.session.flash;
+
+  if (!db.isAvailable()) {
+    return res.render('admin-creches', { creches: [], error: DB_UNAVAILABLE_MESSAGE, success: null });
+  }
+
   const creches = await db.getAllCreches();
   creches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.render('admin-creches', {
@@ -723,6 +749,10 @@ app.get('/admin/creches', requireAuth, async (req, res) => {
 });
 
 app.post('/admin/creches/:id/approuver', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect('/admin/creches');
+  }
   const creche = await db.updateCrecheStatus(req.params.id, 'approved');
   if (creche) {
     req.session.flash = { success: `Crèche "${creche.name}" approuvée.` };
@@ -731,6 +761,10 @@ app.post('/admin/creches/:id/approuver', requireAuth, async (req, res) => {
 });
 
 app.post('/admin/creches/:id/rejeter', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect('/admin/creches');
+  }
   const creche = await db.updateCrecheStatus(req.params.id, 'rejected');
   if (creche) {
     req.session.flash = { success: `Crèche "${creche.name}" refusée.` };
@@ -745,6 +779,16 @@ app.post('/admin/creches/:id/rejeter', requireAuth, async (req, res) => {
 app.get('/admin/commandes-creches', requireAuth, async (req, res) => {
   const flash = req.session.flash || {};
   delete req.session.flash;
+
+  if (!db.isAvailable()) {
+    return res.render('admin-commandes-creches', {
+      orders: [],
+      discountRate: CRECHE_DISCOUNT_RATE,
+      error: DB_UNAVAILABLE_MESSAGE,
+      success: null,
+    });
+  }
+
   const orders = await db.getAllOrders();
   orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.render('admin-commandes-creches', {
@@ -756,6 +800,10 @@ app.get('/admin/commandes-creches', requireAuth, async (req, res) => {
 });
 
 app.get('/admin/commandes-creches/:id/facture', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect('/admin/commandes-creches');
+  }
   const order = await db.getOrderById(req.params.id);
   if (!order) return res.redirect('/admin/commandes-creches');
   const creche = await db.getCrecheById(order.crecheId);
@@ -768,6 +816,11 @@ app.get('/admin/commandes-creches/:id/facture', requireAuth, async (req, res) =>
 });
 
 app.post('/admin/commandes-creches/:id/approuver', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect('/admin/commandes-creches');
+  }
+
   const order = await db.getOrderById(req.params.id);
 
   if (!order) {
@@ -799,6 +852,11 @@ app.post('/admin/commandes-creches/:id/approuver', requireAuth, async (req, res)
 });
 
 app.post('/admin/commandes-creches/:id/rejeter', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect('/admin/commandes-creches');
+  }
+
   const { reason } = req.body;
   const order = await db.rejectOrder(req.params.id, (reason || '').trim() || null);
 
@@ -812,12 +870,14 @@ app.post('/admin/commandes-creches/:id/rejeter', requireAuth, async (req, res) =
 // ================================================================
 
 db.init()
-  .then(() => {
+  .catch(err => {
+    console.error('Erreur inattendue lors de l\'initialisation de la base de données :', err.message || err);
+  })
+  .finally(() => {
     app.listen(PORT, () => {
       console.log(`Portail Approbation Crèches démarré sur http://localhost:${PORT}`);
+      if (!db.isAvailable()) {
+        console.log('Mode dégradé : le portail crèche self-service (inscription/connexion/commandes) est désactivé tant que DATABASE_URL n\'est pas configuré.');
+      }
     });
-  })
-  .catch(err => {
-    console.error('Erreur d\'initialisation de la base de données :', err.message || err.code || err);
-    process.exit(1);
   });

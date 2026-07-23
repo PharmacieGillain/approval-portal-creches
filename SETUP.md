@@ -6,7 +6,35 @@ PostgreSQL au lieu de fichiers JSON locaux (`db/creches.json`,
 **Render Free** est éphémère : tout fichier écrit sur le disque est perdu à
 chaque redéploiement ou redémarrage du service.
 
+## Mode dégradé sans base de données
+
+Si `DATABASE_URL` n'est pas défini (ou si la connexion échoue), le serveur
+démarre quand même — il ne plante plus. Seul le portail crèche self-service
+est désactivé (inscription, connexion, envoi de commande, et les pages admin
+`/admin/creches` et `/admin/commandes-creches` affichent un message
+« temporairement indisponible »). Le reste de l'application — connexion
+admin, tableau de bord, historique, approbation/refus des commandes Shopify —
+continue de fonctionner normalement, car ces routes n'utilisent pas la base
+de données.
+
 ## 1. Créer la base PostgreSQL gratuite sur Render
+
+Deux façons de faire, selon comment ce service a été créé sur Render :
+
+### Option A — Le service a été créé via "New Blueprint" (render.yaml)
+
+`render.yaml` déclare maintenant une base `approval-portal-creches-db` (plan
+Free) et relie automatiquement `DATABASE_URL` dessus via `fromDatabase`. Si
+vous (re)synchronisez le Blueprint sur Render (dashboard → votre Blueprint →
+**Sync**, ou en créant le service via **New +** → **Blueprint** en pointant
+sur ce repo), Render crée la base et remplit `DATABASE_URL` tout seul — rien
+d'autre à faire, passez à l'étape 3.
+
+### Option B — Le service a été créé manuellement ("New Web Service")
+
+C'est probablement le cas actuellement (le service existait déjà avant ce
+`render.yaml`). Render ne lit alors pas la section `databases:` du fichier,
+donc il faut créer la base à la main :
 
 1. Dans le [dashboard Render](https://dashboard.render.com), cliquez sur
    **New +** → **PostgreSQL**.
@@ -22,7 +50,10 @@ chaque redéploiement ou redémarrage du service.
 > plan payant. Pensez à surveiller les emails de Render à ce sujet, ou passez
 > à un plan payant avant l'expiration si l'application est en production.
 
-## 2. Relier la base au service web
+## 2. Relier la base au service web (Option B uniquement)
+
+Si vous avez suivi l'Option A ci-dessus, `DATABASE_URL` est déjà configuré —
+passez à l'étape 3.
 
 1. Ouvrez la page de la base de données que vous venez de créer.
 2. Copiez la valeur **Internal Database URL** (à utiliser si le service web
@@ -69,13 +100,20 @@ npm run dev
 
 ## 4. Vérification
 
-Si `DATABASE_URL` n'est pas défini, le serveur refuse de démarrer et affiche
-un message d'erreur explicite au lancement. Si la variable est bien
-configurée, vous devriez voir dans les logs :
+Au démarrage, regardez les logs :
 
-```
-Portail Approbation Crèches démarré sur http://localhost:3000
-```
+- Si `DATABASE_URL` est bien configuré et la connexion réussit :
+  ```
+  Base de données PostgreSQL connectée — tables vérifiées/créées.
+  Portail Approbation Crèches démarré sur http://localhost:3000
+  ```
+- Si `DATABASE_URL` est absent ou la connexion échoue, le serveur démarre
+  quand même, en mode dégradé (voir plus haut) :
+  ```
+  DATABASE_URL non défini : démarrage sans base de données. [...]
+  Portail Approbation Crèches démarré sur http://localhost:3000
+  Mode dégradé : le portail crèche self-service [...] est désactivé [...]
+  ```
 
 ## Ancien stockage JSON
 
