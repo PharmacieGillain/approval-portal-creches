@@ -25,6 +25,15 @@ services:
       - key: SESSION_SECRET
         generateValue: true
 
+      # Base de données — OBLIGATOIRE, à créer manuellement dans le dashboard Render :
+      # New +  →  PostgreSQL  →  plan Free  →  puis copier son "Internal Database URL"
+      # dans la variable DATABASE_URL de ce service (dashboard Render → Environment).
+      # Voir SETUP.md pour la marche à suivre complète.
+      # Le stockage sur disque local (db/*.json) est éphémère sur le plan free
+      # de Render : il est réinitialisé à chaque redéploiement/redémarrage.
+      - key: DATABASE_URL
+        sync: false
+
       # Email SMTP — optionnel, à renseigner dans le dashboard Render
       - key: SMTP_HOST
         sync: false

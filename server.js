@@ -5,9 +5,9 @@ const session = require('express-session');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -114,25 +114,6 @@ async function updateOrderTags(orderId, removeTag, addTag) {
 // --- Crèche discount ---
 
 const CRECHE_DISCOUNT_RATE = 0.10; // 10% applied to all crèche Shopify orders
-
-// --- DB helpers ---
-
-const DB_DIR = path.join(__dirname, 'db');
-const CRECHES_FILE = path.join(DB_DIR, 'creches.json');
-const ORDERS_FILE = path.join(DB_DIR, 'pending-orders.json');
-
-if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-if (!fs.existsSync(CRECHES_FILE)) fs.writeFileSync(CRECHES_FILE, '[]', 'utf8');
-if (!fs.existsSync(ORDERS_FILE)) fs.writeFileSync(ORDERS_FILE, '[]', 'utf8');
-
-function readJson(file) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch { return []; }
-}
-
-function writeJson(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
-}
 
 // --- Shopify order creation for crèche orders ---
 
@@ -265,7 +246,12 @@ app.get('/historique', requireAuth, async (req, res) => {
 
 // Dashboard — list pending orders
 app.get('/tableau-de-bord', requireAuth, async (req, res) => {
-  const pendingCrecheCount = readJson(ORDERS_FILE).filter(o => o.status === 'en_attente').length;
+  let pendingCrecheCount = 0;
+  try {
+    pendingCrecheCount = (await db.getAllOrders()).filter(o => o.status === 'en_attente').length;
+  } catch (e) {
+    console.error('Pending crèche count error:', e.message);
+  }
   try {
     const data = await shopifyRest(
       'GET',
@@ -564,8 +550,8 @@ app.post('/creche/register', async (req, res) => {
     });
   }
 
-  const creches = readJson(CRECHES_FILE);
-  if (creches.find(c => c.email.toLowerCase() === email.toLowerCase())) {
+  const existing = await db.getCrecheByEmail(email.trim().toLowerCase());
+  if (existing) {
     return res.render('creche-register', {
       error: 'Un compte avec cette adresse email existe déjà.',
       success: null,
@@ -573,20 +559,17 @@ app.post('/creche/register', async (req, res) => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const newCreche = {
+  await db.createCreche({
     id: crypto.randomUUID(),
     name: name.trim(),
     contact: contact.trim(),
     email: email.trim().toLowerCase(),
-    password: hashedPassword,
+    passwordHash: hashedPassword,
     phone: (phone || '').trim(),
     address: address.trim(),
     status: 'pending_approval',
     createdAt: new Date().toISOString(),
-  };
-
-  creches.push(newCreche);
-  writeJson(CRECHES_FILE, creches);
+  });
 
   res.render('creche-register', {
     error: null,
@@ -608,8 +591,7 @@ app.post('/creche/login', async (req, res) => {
     return res.render('creche-login', { error: 'Veuillez remplir tous les champs.' });
   }
 
-  const creches = readJson(CRECHES_FILE);
-  const creche = creches.find(c => c.email === email.trim().toLowerCase());
+  const creche = await db.getCrecheByEmail(email.trim().toLowerCase());
 
   if (!creche || !(await bcrypt.compare(password, creche.password))) {
     return res.render('creche-login', { error: 'Email ou mot de passe incorrect.' });
@@ -708,7 +690,7 @@ app.post('/creche/commande', requireCrecheAuth, async (req, res) => {
     .reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0)
     .toFixed(2);
 
-  const order = {
+  await db.createOrder({
     id: crypto.randomUUID(),
     crecheId: req.session.crecheId,
     crecheName: req.session.crecheName,
@@ -716,14 +698,7 @@ app.post('/creche/commande', requireCrecheAuth, async (req, res) => {
     total,
     status: 'en_attente',
     createdAt: new Date().toISOString(),
-    rejectionReason: null,
-    shopifyOrderId: null,
-    shopifyOrderNumber: null,
-  };
-
-  const orders = readJson(ORDERS_FILE);
-  orders.push(order);
-  writeJson(ORDERS_FILE, orders);
+  });
 
   req.session.flash = {
     success: 'Votre commande a été envoyée à l\'enseigne pour validation.',
@@ -735,10 +710,10 @@ app.post('/creche/commande', requireCrecheAuth, async (req, res) => {
 // ADMIN — CRÈCHE MANAGEMENT
 // ================================================================
 
-app.get('/admin/creches', requireAuth, (req, res) => {
+app.get('/admin/creches', requireAuth, async (req, res) => {
   const flash = req.session.flash || {};
   delete req.session.flash;
-  const creches = readJson(CRECHES_FILE);
+  const creches = await db.getAllCreches();
   creches.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.render('admin-creches', {
     creches,
@@ -747,24 +722,18 @@ app.get('/admin/creches', requireAuth, (req, res) => {
   });
 });
 
-app.post('/admin/creches/:id/approuver', requireAuth, (req, res) => {
-  const creches = readJson(CRECHES_FILE);
-  const idx = creches.findIndex(c => c.id === req.params.id);
-  if (idx !== -1) {
-    creches[idx].status = 'approved';
-    writeJson(CRECHES_FILE, creches);
-    req.session.flash = { success: `Crèche "${creches[idx].name}" approuvée.` };
+app.post('/admin/creches/:id/approuver', requireAuth, async (req, res) => {
+  const creche = await db.updateCrecheStatus(req.params.id, 'approved');
+  if (creche) {
+    req.session.flash = { success: `Crèche "${creche.name}" approuvée.` };
   }
   res.redirect('/admin/creches');
 });
 
-app.post('/admin/creches/:id/rejeter', requireAuth, (req, res) => {
-  const creches = readJson(CRECHES_FILE);
-  const idx = creches.findIndex(c => c.id === req.params.id);
-  if (idx !== -1) {
-    creches[idx].status = 'rejected';
-    writeJson(CRECHES_FILE, creches);
-    req.session.flash = { success: `Crèche "${creches[idx].name}" refusée.` };
+app.post('/admin/creches/:id/rejeter', requireAuth, async (req, res) => {
+  const creche = await db.updateCrecheStatus(req.params.id, 'rejected');
+  if (creche) {
+    req.session.flash = { success: `Crèche "${creche.name}" refusée.` };
   }
   res.redirect('/admin/creches');
 });
@@ -773,10 +742,10 @@ app.post('/admin/creches/:id/rejeter', requireAuth, (req, res) => {
 // ADMIN — CRÈCHE ORDERS MANAGEMENT
 // ================================================================
 
-app.get('/admin/commandes-creches', requireAuth, (req, res) => {
+app.get('/admin/commandes-creches', requireAuth, async (req, res) => {
   const flash = req.session.flash || {};
   delete req.session.flash;
-  const orders = readJson(ORDERS_FILE);
+  const orders = await db.getAllOrders();
   orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   res.render('admin-commandes-creches', {
     orders,
@@ -786,12 +755,10 @@ app.get('/admin/commandes-creches', requireAuth, (req, res) => {
   });
 });
 
-app.get('/admin/commandes-creches/:id/facture', requireAuth, (req, res) => {
-  const orders = readJson(ORDERS_FILE);
-  const order = orders.find(o => o.id === req.params.id);
+app.get('/admin/commandes-creches/:id/facture', requireAuth, async (req, res) => {
+  const order = await db.getOrderById(req.params.id);
   if (!order) return res.redirect('/admin/commandes-creches');
-  const creches = readJson(CRECHES_FILE);
-  const creche = creches.find(c => c.id === order.crecheId) || null;
+  const creche = await db.getCrecheById(order.crecheId);
   res.render('facture', {
     order,
     creche,
@@ -801,17 +768,14 @@ app.get('/admin/commandes-creches/:id/facture', requireAuth, (req, res) => {
 });
 
 app.post('/admin/commandes-creches/:id/approuver', requireAuth, async (req, res) => {
-  const orders = readJson(ORDERS_FILE);
-  const idx = orders.findIndex(o => o.id === req.params.id);
+  const order = await db.getOrderById(req.params.id);
 
-  if (idx === -1) {
+  if (!order) {
     req.session.flash = { error: 'Commande introuvable.' };
     return res.redirect('/admin/commandes-creches');
   }
 
-  const order = orders[idx];
-  const creches = readJson(CRECHES_FILE);
-  const creche = creches.find(c => c.id === order.crecheId);
+  const creche = await db.getCrecheById(order.crecheId);
 
   if (!creche) {
     req.session.flash = { error: 'Crèche associée à cette commande introuvable.' };
@@ -820,10 +784,7 @@ app.post('/admin/commandes-creches/:id/approuver', requireAuth, async (req, res)
 
   try {
     const shopifyOrder = await createShopifyOrderForCreche(order, creche);
-    orders[idx].status = 'approuvee';
-    orders[idx].shopifyOrderId = String(shopifyOrder.id);
-    orders[idx].shopifyOrderNumber = shopifyOrder.order_number;
-    writeJson(ORDERS_FILE, orders);
+    await db.approveOrder(order.id, String(shopifyOrder.id), shopifyOrder.order_number);
     req.session.flash = {
       success: `Commande de ${order.crecheName} approuvée — commande Shopify #${shopifyOrder.order_number} créée.`,
     };
@@ -837,16 +798,12 @@ app.post('/admin/commandes-creches/:id/approuver', requireAuth, async (req, res)
   res.redirect('/admin/commandes-creches');
 });
 
-app.post('/admin/commandes-creches/:id/rejeter', requireAuth, (req, res) => {
+app.post('/admin/commandes-creches/:id/rejeter', requireAuth, async (req, res) => {
   const { reason } = req.body;
-  const orders = readJson(ORDERS_FILE);
-  const idx = orders.findIndex(o => o.id === req.params.id);
+  const order = await db.rejectOrder(req.params.id, (reason || '').trim() || null);
 
-  if (idx !== -1) {
-    orders[idx].status = 'rejetee';
-    orders[idx].rejectionReason = (reason || '').trim() || null;
-    writeJson(ORDERS_FILE, orders);
-    req.session.flash = { success: `Commande de ${orders[idx].crecheName} refusée.` };
+  if (order) {
+    req.session.flash = { success: `Commande de ${order.crecheName} refusée.` };
   }
 
   res.redirect('/admin/commandes-creches');
@@ -854,6 +811,13 @@ app.post('/admin/commandes-creches/:id/rejeter', requireAuth, (req, res) => {
 
 // ================================================================
 
-app.listen(PORT, () => {
-  console.log(`Portail Approbation Crèches démarré sur http://localhost:${PORT}`);
-});
+db.init()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Portail Approbation Crèches démarré sur http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('Erreur d\'initialisation de la base de données :', err.message || err.code || err);
+    process.exit(1);
+  });
