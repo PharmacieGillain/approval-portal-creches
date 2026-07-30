@@ -475,6 +475,16 @@ app.post('/commandes/:id/refuser', requireAuth, async (req, res) => {
   }
 });
 
+// Resolve the best image URL for a variant: variant-specific image, else product's main image
+function resolveVariantImage(product, variant) {
+  if (variant.image_id && Array.isArray(product.images)) {
+    const img = product.images.find(i => i.id === variant.image_id);
+    if (img && img.src) return img.src;
+  }
+  if (product.image && product.image.src) return product.image.src;
+  return null;
+}
+
 // All products in collection (AJAX — initial load)
 app.get('/api/produits/collection', requireAuth, async (req, res) => {
   try {
@@ -491,6 +501,7 @@ app.get('/api/produits/collection', requireAuth, async (req, res) => {
           variantTitle: variant.title !== 'Default Title' ? variant.title : null,
           price: parseFloat(variant.price).toFixed(2),
           sku: variant.sku || '',
+          image: resolveVariantImage(product, variant),
         });
       }
     }
@@ -521,6 +532,7 @@ app.get('/api/produits/recherche', requireAuth, async (req, res) => {
           variantTitle: variant.title !== 'Default Title' ? variant.title : null,
           price: parseFloat(variant.price).toFixed(2),
           sku: variant.sku || '',
+          image: resolveVariantImage(product, variant),
         });
       }
     }
@@ -654,6 +666,7 @@ app.get('/creche/commande', requireCrecheAuth, async (req, res) => {
           variantTitle: variant.title !== 'Default Title' ? variant.title : null,
           price: parseFloat(variant.price).toFixed(2),
           sku: variant.sku || '',
+          image: resolveVariantImage(product, variant),
         });
       }
     }
