@@ -45,7 +45,14 @@
         <h1 class="page-title">Commande #<%= order.order_number %></h1>
         <p class="page-subtitle">Passée le <%= formatDateTime(order.created_at) %></p>
       </div>
-      <span class="badge badge-pending">En attente de validation</span>
+      <% const headerStatus = getOrderStatus(order); %>
+      <% if (headerStatus === 'validé') { %>
+        <span class="badge badge-success">Validée</span>
+      <% } else if (headerStatus === 'refusé') { %>
+        <span class="badge badge-danger">Refusée</span>
+      <% } else { %>
+        <span class="badge badge-pending">En attente de validation</span>
+      <% } %>
     </div>
 
     <!-- Info panels -->
