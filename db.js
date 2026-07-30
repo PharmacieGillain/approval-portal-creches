@@ -49,9 +49,13 @@ async function init() {
         phone TEXT,
         address TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending_approval',
+        active BOOLEAN NOT NULL DEFAULT true,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `);
+
+    // Migration for pre-existing databases created before the `active` column existed.
+    await pool.query(`ALTER TABLE creches ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT true;`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pending_orders (
@@ -93,6 +97,7 @@ function mapCreche(row) {
     phone: row.phone || '',
     address: row.address,
     status: row.status,
+    active: row.active,
     createdAt: row.created_at,
   };
 }
@@ -165,11 +170,29 @@ async function updateCrecheStatus(id, status) {
   return mapCreche(rows[0]);
 }
 
+async function setCrecheActive(id, active) {
+  assertAvailable();
+  const { rows } = await queryTolerantToBadUuid(
+    'UPDATE creches SET active = $1 WHERE id = $2 RETURNING *',
+    [active, id]
+  );
+  return mapCreche(rows[0]);
+}
+
 // --- Pending orders (crèche self-service orders) ---
 
 async function getAllOrders() {
   assertAvailable();
   const { rows } = await pool.query('SELECT * FROM pending_orders');
+  return rows.map(mapOrder);
+}
+
+async function getOrdersByCrecheId(crecheId) {
+  assertAvailable();
+  const { rows } = await queryTolerantToBadUuid(
+    'SELECT * FROM pending_orders WHERE creche_id = $1 ORDER BY created_at DESC',
+    [crecheId]
+  );
   return rows.map(mapOrder);
 }
 
@@ -219,7 +242,9 @@ module.exports = {
   getCrecheByEmail,
   createCreche,
   updateCrecheStatus,
+  setCrecheActive,
   getAllOrders,
+  getOrdersByCrecheId,
   getOrderById,
   createOrder,
   approveOrder,

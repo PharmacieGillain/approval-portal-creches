@@ -73,6 +73,7 @@
               <th>Adresse</th>
               <th>Date d'inscription</th>
               <th>Statut</th>
+              <th>Compte</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -97,7 +98,15 @@
                 <% } %>
               </td>
               <td>
-                <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+                <% if (creche.active === false) { %>
+                  <span class="badge badge-danger">Désactivé</span>
+                <% } else { %>
+                  <span class="badge badge-success">Actif</span>
+                <% } %>
+              </td>
+              <td>
+                <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
+                  <a href="/admin/creches/<%= creche.id %>/compte" class="btn btn-sm btn-secondary">Voir le compte</a>
                   <% if (creche.status !== 'approved' && creche.status !== 'rejected') { %>
                   <form method="POST" action="/admin/creches/<%= creche.id %>/approuver" style="display:inline">
                     <button type="submit" class="btn btn-sm btn-approve"
@@ -111,8 +120,6 @@
                       Refuser
                     </button>
                   </form>
-                  <% } else { %>
-                  <span class="text-muted" style="font-size:.85rem">Décision déjà prise</span>
                   <% } %>
                 </div>
               </td>

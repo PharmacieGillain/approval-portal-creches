@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compte <%= creche.name %> — Portail Crèches</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="8" fill="#1e3a5f"/>
+        <path d="M24 10C16.27 10 10 16.27 10 24s6.27 14 14 14 14-6.27 14-14S31.73 10 24 10zm2 21h-4v-4h4v4zm0-8h-4V15h4v8z" fill="white"/>
+      </svg>
+      <span>Portail Crèches</span>
+    </div>
+    <div class="navbar-links">
+      <a href="/tableau-de-bord" class="nav-link">Tableau de bord</a>
+      <a href="/historique" class="nav-link">Historique</a>
+      <span style="width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 .15rem;display:inline-block;vertical-align:middle"></span>
+      <a href="/admin/creches" class="nav-link nav-link-active">Crèches</a>
+      <a href="/admin/commandes-creches" class="nav-link">Commandes crèches</a>
+      <span style="width:1px;height:20px;background:rgba(255,255,255,.2);margin:0 .15rem;display:inline-block;vertical-align:middle"></span>
+      <a href="/deconnexion" class="nav-link">Déconnexion</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <% if (error) { %>
+      <div class="alert alert-error">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <%= error %>
+      </div>
+    <% } %>
+    <% if (success) { %>
+      <div class="alert alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <%= success %>
+      </div>
+    <% } %>
+
+    <p style="margin-bottom:1rem">
+      <a href="/admin/creches" class="link" style="font-size:.9rem">← Retour à la liste des crèches</a>
+    </p>
+
+    <!-- Account info card -->
+    <div class="card" style="margin-bottom:1.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+        <div>
+          <h1 class="page-title" style="margin-bottom:.35rem"><%= creche.name %></h1>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <% if (creche.status === 'approved') { %>
+              <span class="badge badge-success">Approuvée</span>
+            <% } else if (creche.status === 'rejected') { %>
+              <span class="badge badge-danger">Refusée</span>
+            <% } else { %>
+              <span class="badge badge-pending">En attente</span>
+            <% } %>
+            <% if (creche.active === false) { %>
+              <span class="badge badge-danger">Compte désactivé</span>
+            <% } else { %>
+              <span class="badge badge-success">Compte actif</span>
+            <% } %>
+          </div>
+        </div>
+        <div>
+          <% if (creche.active === false) { %>
+          <form method="POST" action="/admin/creches/<%= creche.id %>/activer">
+            <button type="submit" class="btn btn-approve"
+              onclick="return confirm('Réactiver le compte de <%= creche.name %> ? L\'établissement pourra à nouveau se connecter et commander.')">
+              Réactiver le compte
+            </button>
+          </form>
+          <% } else { %>
+          <form method="POST" action="/admin/creches/<%= creche.id %>/desactiver">
+            <button type="submit" class="btn btn-reject"
+              onclick="return confirm('Désactiver le compte de <%= creche.name %> ? L\'établissement ne pourra plus se connecter ni commander.')">
+              Désactiver le compte
+            </button>
+          </form>
+          <% } %>
+        </div>
+      </div>
+
+      <dl class="info-list" style="margin-top:1.25rem">
+        <dt>Contact</dt>
+        <dd><%= creche.contact %></dd>
+        <dt>Email</dt>
+        <dd><a href="mailto:<%= creche.email %>" class="link"><%= creche.email %></a></dd>
+        <% if (creche.phone) { %>
+        <dt>Téléphone</dt>
+        <dd><%= creche.phone %></dd>
+        <% } %>
+        <dt>Adresse</dt>
+        <dd><%= creche.address %></dd>
+        <dt>Inscrit le</dt>
+        <dd><%= formatDateTime(creche.createdAt) %></dd>
+      </dl>
+    </div>
+
+    <!-- Orders / invoices -->
+    <div class="page-header">
+      <div>
+        <h2 class="page-title" style="font-size:1.3rem">Commandes &amp; factures</h2>
+        <p class="page-subtitle"><%= orders.length %> commande(s) affichée(s)</p>
+      </div>
+    </div>
+
+    <form method="GET" action="/admin/creches/<%= creche.id %>/compte" class="card" style="margin-bottom:1.25rem;display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap">
+      <div style="min-width:180px">
+        <label class="form-label">Statut</label>
+        <select name="statut" class="form-input" onchange="this.form.submit()">
+          <option value="tous" <%= statusFilter === 'tous' ? 'selected' : '' %>>Tous</option>
+          <option value="en_attente" <%= statusFilter === 'en_attente' ? 'selected' : '' %>>En attente</option>
+          <option value="approuvee" <%= statusFilter === 'approuvee' ? 'selected' : '' %>>Approuvée</option>
+          <option value="rejetee" <%= statusFilter === 'rejetee' ? 'selected' : '' %>>Refusée</option>
+        </select>
+      </div>
+      <div style="min-width:160px">
+        <label class="form-label">Du</label>
+        <input type="date" name="du" class="form-input" value="<%= dateFrom %>">
+      </div>
+      <div style="min-width:160px">
+        <label class="form-label">Au</label>
+        <input type="date" name="au" class="form-input" value="<%= dateTo %>">
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button type="submit" class="btn btn-secondary">Filtrer</button>
+        <% if (statusFilter !== 'tous' || dateFrom || dateTo) { %>
+        <a href="/admin/creches/<%= creche.id %>/compte" class="btn btn-ghost">Réinitialiser</a>
+        <% } %>
+      </div>
+    </form>
+
+    <% if (orders.length === 0) { %>
+      <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <h2>Aucune commande</h2>
+        <p>Aucune commande ne correspond aux filtres sélectionnés.</p>
+      </div>
+    <% } else { %>
+    <div class="table-wrapper">
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Statut</th>
+            <th>Référence(s)</th>
+            <th>Total net</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% orders.forEach(order => { %>
+          <% const totalNet = (parseFloat(order.total) * (1 - discountRate)).toFixed(2); %>
+          <tr>
+            <td><%= formatDateTime(order.createdAt) %></td>
+            <td>
+              <% if (order.status === 'approuvee') { %>
+                <span class="badge badge-success">Approuvée</span>
+              <% } else if (order.status === 'rejetee') { %>
+                <span class="badge badge-danger">Refusée</span>
+              <% } else { %>
+                <span class="badge badge-pending">En attente</span>
+              <% } %>
+            </td>
+            <td class="text-muted"><%= order.items.length %> référence(s)</td>
+            <td class="price-cell"><strong><%= totalNet %> EUR</strong></td>
+            <td>
+              <a href="/admin/commandes-creches/<%= order.id %>/facture" target="_blank" class="btn btn-sm btn-secondary">
+                Facture
+              </a>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </main>
+</body>
+</html>

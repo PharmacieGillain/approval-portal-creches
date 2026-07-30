@@ -183,9 +183,19 @@ const requireAuth = (req, res, next) => {
   res.redirect('/login');
 };
 
-const requireCrecheAuth = (req, res, next) => {
-  if (req.session.crecheId) return next();
-  res.redirect('/creche/login');
+const requireCrecheAuth = async (req, res, next) => {
+  if (!req.session.crecheId) return res.redirect('/creche/login');
+  if (!db.isAvailable()) return next();
+  try {
+    const creche = await db.getCrecheById(req.session.crecheId);
+    if (!creche || creche.active === false || creche.status === 'rejected') {
+      req.session.destroy(() => res.redirect('/creche/login'));
+      return;
+    }
+  } catch (e) {
+    console.error('requireCrecheAuth check error:', e.message);
+  }
+  next();
 };
 
 // ================================================================
@@ -644,6 +654,12 @@ app.post('/creche/login', async (req, res) => {
     });
   }
 
+  if (creche.active === false) {
+    return res.render('creche-login', {
+      error: 'Votre compte a été désactivé par l\'enseigne. Veuillez la contacter.',
+    });
+  }
+
   req.session.crecheId = creche.id;
   req.session.crecheName = creche.name;
   res.redirect('/creche/commande');
@@ -794,6 +810,77 @@ app.post('/admin/creches/:id/rejeter', requireAuth, async (req, res) => {
     req.session.flash = { error: `Cette demande a déjà été traitée et ne peut plus être modifiée.` };
   }
   res.redirect('/admin/creches');
+});
+
+// Crèche account detail — info, activation toggle, and all their invoices (filterable)
+app.get('/admin/creches/:id/compte', requireAuth, async (req, res) => {
+  const flash = req.session.flash || {};
+  delete req.session.flash;
+
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect('/admin/creches');
+  }
+
+  const creche = await db.getCrecheById(req.params.id);
+  if (!creche) {
+    req.session.flash = { error: 'Établissement introuvable.' };
+    return res.redirect('/admin/creches');
+  }
+
+  let orders = await db.getOrdersByCrecheId(creche.id);
+
+  const statusFilter = req.query.statut || 'tous';
+  if (statusFilter !== 'tous') {
+    orders = orders.filter(o => o.status === statusFilter);
+  }
+
+  const dateFrom = req.query.du || '';
+  const dateTo = req.query.au || '';
+  if (dateFrom) {
+    const from = new Date(dateFrom);
+    orders = orders.filter(o => new Date(o.createdAt) >= from);
+  }
+  if (dateTo) {
+    const to = new Date(dateTo);
+    to.setHours(23, 59, 59, 999);
+    orders = orders.filter(o => new Date(o.createdAt) <= to);
+  }
+
+  res.render('admin-creche-detail', {
+    creche,
+    orders,
+    statusFilter,
+    dateFrom,
+    dateTo,
+    discountRate: CRECHE_DISCOUNT_RATE,
+    error: flash.error || null,
+    success: flash.success || null,
+  });
+});
+
+app.post('/admin/creches/:id/desactiver', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect(`/admin/creches/${req.params.id}/compte`);
+  }
+  const creche = await db.setCrecheActive(req.params.id, false);
+  req.session.flash = creche
+    ? { success: `Compte de "${creche.name}" désactivé. Cet établissement ne peut plus se connecter ni commander.` }
+    : { error: 'Établissement introuvable.' };
+  res.redirect(`/admin/creches/${req.params.id}/compte`);
+});
+
+app.post('/admin/creches/:id/activer', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect(`/admin/creches/${req.params.id}/compte`);
+  }
+  const creche = await db.setCrecheActive(req.params.id, true);
+  req.session.flash = creche
+    ? { success: `Compte de "${creche.name}" réactivé.` }
+    : { error: 'Établissement introuvable.' };
+  res.redirect(`/admin/creches/${req.params.id}/compte`);
 });
 
 // ================================================================
