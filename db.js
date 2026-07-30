@@ -159,7 +159,7 @@ async function createCreche({ id, name, contact, email, passwordHash, phone, add
 async function updateCrecheStatus(id, status) {
   assertAvailable();
   const { rows } = await queryTolerantToBadUuid(
-    'UPDATE creches SET status = $1 WHERE id = $2 RETURNING *',
+    "UPDATE creches SET status = $1 WHERE id = $2 AND status = 'pending_approval' RETURNING *",
     [status, id]
   );
   return mapCreche(rows[0]);

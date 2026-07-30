@@ -776,6 +776,8 @@ app.post('/admin/creches/:id/approuver', requireAuth, async (req, res) => {
   const creche = await db.updateCrecheStatus(req.params.id, 'approved');
   if (creche) {
     req.session.flash = { success: `Crèche "${creche.name}" approuvée.` };
+  } else {
+    req.session.flash = { error: `Cette demande a déjà été traitée et ne peut plus être modifiée.` };
   }
   res.redirect('/admin/creches');
 });
@@ -788,6 +790,8 @@ app.post('/admin/creches/:id/rejeter', requireAuth, async (req, res) => {
   const creche = await db.updateCrecheStatus(req.params.id, 'rejected');
   if (creche) {
     req.session.flash = { success: `Crèche "${creche.name}" refusée.` };
+  } else {
+    req.session.flash = { error: `Cette demande a déjà été traitée et ne peut plus être modifiée.` };
   }
   res.redirect('/admin/creches');
 });

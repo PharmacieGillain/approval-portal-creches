@@ -98,21 +98,21 @@
               </td>
               <td>
                 <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-                  <% if (creche.status !== 'approved') { %>
+                  <% if (creche.status !== 'approved' && creche.status !== 'rejected') { %>
                   <form method="POST" action="/admin/creches/<%= creche.id %>/approuver" style="display:inline">
                     <button type="submit" class="btn btn-sm btn-approve"
                       onclick="return confirm('Approuver l\'accès à <%= creche.name %> ?')">
                       Approuver
                     </button>
                   </form>
-                  <% } %>
-                  <% if (creche.status !== 'rejected') { %>
                   <form method="POST" action="/admin/creches/<%= creche.id %>/rejeter" style="display:inline">
                     <button type="submit" class="btn btn-sm btn-reject"
                       onclick="return confirm('Refuser l\'accès à <%= creche.name %> ?')">
                       Refuser
                     </button>
                   </form>
+                  <% } else { %>
+                  <span class="text-muted" style="font-size:.85rem">Décision déjà prise</span>
                   <% } %>
                 </div>
               </td>
