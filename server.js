@@ -292,6 +292,13 @@ app.get('/commandes/:id', requireAuth, async (req, res) => {
 app.post('/commandes/:id/modifier', requireAuth, async (req, res) => {
   const orderId = req.params.id;
   try {
+    const existing = await shopifyRest('GET', `orders/${orderId}.json`);
+    const currentStatus = getOrderStatus(existing.order);
+    if (currentStatus === 'validé' || currentStatus === 'refusé') {
+      req.session.flash = { error: 'Cette commande est déjà validée ou refusée et ne peut plus être modifiée.', success: null };
+      return res.redirect(`/commandes/${orderId}`);
+    }
+
     const { quantities, removed_items, new_variants, new_quantities } = req.body;
     const orderGid = `gid://shopify/Order/${orderId}`;
 

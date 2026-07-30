@@ -133,13 +133,19 @@
     </div>
 
     <!-- Line items editing -->
+    <% const editable = (headerStatus !== 'validé' && headerStatus !== 'refusé'); %>
     <div class="card">
       <h2 class="card-title">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
         Produits de la commande
       </h2>
+      <% if (editable) { %>
       <p class="section-help">Modifiez les quantités ou ajoutez/supprimez des produits, puis cliquez sur <strong>Sauvegarder</strong> avant d'approuver.</p>
+      <% } else { %>
+      <p class="section-help">Cette commande a déjà été <%= headerStatus === 'validé' ? 'validée' : 'refusée' %> et ne peut plus être modifiée.</p>
+      <% } %>
 
+      <% if (editable) { %>
       <form id="editForm" action="/commandes/<%= order.id %>/modifier" method="POST">
         <div class="table-wrapper">
           <table class="items-table">
@@ -215,6 +221,39 @@
           <a href="/tableau-de-bord" class="btn btn-ghost">Annuler</a>
         </div>
       </form>
+      <% } else { %>
+      <div class="table-wrapper">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th>SKU</th>
+              <th>Prix unitaire</th>
+              <th>Quantité</th>
+              <th>Sous-total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% order.line_items.forEach(item => { %>
+            <tr class="line-item-row">
+              <td>
+                <div class="product-name"><%= item.title %></div>
+                <% if (item.variant_title && item.variant_title !== 'Default Title') { %>
+                <div class="product-variant"><%= item.variant_title %></div>
+                <% } %>
+              </td>
+              <td class="text-muted sku-cell"><%= item.sku || '—' %></td>
+              <td class="price-cell"><%= parseFloat(item.price).toFixed(2) %> <%= order.currency %></td>
+              <td><%= item.quantity %></td>
+              <td class="row-total price-cell">
+                <%= (parseFloat(item.price) * item.quantity).toFixed(2) %> <%= order.currency %>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
     </div>
 
     <!-- Decision panel -->
@@ -223,13 +262,12 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14l-4-4 1.41-1.41L10 13.17l6.59-6.59L18 8l-8 8z"/></svg>
         Décision
       </h2>
-      <% const currentStatus = getOrderStatus(order); %>
-      <% if (currentStatus === 'validé') { %>
+      <% if (headerStatus === 'validé') { %>
         <div class="alert alert-success">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
           ✅ Commande déjà validée
         </div>
-      <% } else if (currentStatus === 'refusé') { %>
+      <% } else if (headerStatus === 'refusé') { %>
         <div class="alert alert-error">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
           ❌ Commande refusée
