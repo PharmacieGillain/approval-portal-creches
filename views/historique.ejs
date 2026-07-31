@@ -80,7 +80,7 @@
             %>
             <tr class="order-row" data-customer="<%= customer %>">
               <td>
-                <span class="order-number">#<%= order.order_number %></span>
+                <span class="order-number">#<%= order.order_number || ('L-' + String(order._localId || '').slice(-6).toUpperCase()) %></span>
               </td>
               <td class="text-muted">
                 <%= formatDate(order.created_at) %>
@@ -121,9 +121,15 @@
                 <% } %>
               </td>
               <td>
+                <% if (order._local) { %>
+                <a href="/admin/commandes-creches/<%= order._localId %>/facture" target="_blank" class="btn btn-sm btn-secondary">
+                  Voir
+                </a>
+                <% } else { %>
                 <a href="/commandes/<%= order.id %>" class="btn btn-sm btn-secondary">
                   Voir
                 </a>
+                <% } %>
               </td>
             </tr>
             <% }); %>

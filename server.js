@@ -242,6 +242,54 @@ app.get('/historique', requireAuth, async (req, res) => {
         orders.push(order);
       }
     }
+
+    // Also include orders placed through the self-service crèche portal (local DB).
+    // These are pushed to Shopify with a 'validé' tag on approval, but Shopify's
+    // REST API does not always persist tags reliably on order creation — so we
+    // don't rely on Shopify's tag search alone for our own authoritative records.
+    if (db.isAvailable()) {
+      try {
+        const localOrders = await db.getAllOrders();
+        const creches = await db.getAllCreches();
+        const crecheById = new Map(creches.map(c => [c.id, c]));
+
+        const statusToTag = {
+          approuvee: 'validé',
+          rejetee: 'refusé',
+          en_attente: 'en-attente-validation',
+        };
+
+        for (const lo of localOrders) {
+          // Skip if this local order's Shopify order was already picked up above (avoids duplicates).
+          if (lo.shopifyOrderId && seen.has(parseInt(lo.shopifyOrderId, 10))) continue;
+
+          const creche = crecheById.get(lo.crecheId);
+          const subtotal = lo.items.reduce((s, i) => s + parseFloat(i.price) * i.quantity, 0);
+          const totalNet = (subtotal * (1 - CRECHE_DISCOUNT_RATE)).toFixed(2);
+
+          orders.push({
+            id: lo.shopifyOrderId || lo.id,
+            order_number: lo.shopifyOrderNumber || null,
+            created_at: lo.createdAt,
+            currency: 'EUR',
+            total_price: totalNet,
+            billing_address: { company: lo.crecheName, name: creche ? creche.contact : '' },
+            customer: null,
+            line_items: lo.items.map(i => ({
+              title: i.productTitle,
+              variant_title: i.variantTitle,
+              quantity: i.quantity,
+            })),
+            tags: statusToTag[lo.status] || '',
+            _local: true,
+            _localId: lo.id,
+          });
+        }
+      } catch (e) {
+        console.error('Historique — local orders merge error:', e.message);
+      }
+    }
+
     orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     res.render('historique', { orders, error: null });
