@@ -179,6 +179,27 @@ async function setCrecheActive(id, active) {
   return mapCreche(rows[0]);
 }
 
+async function updateCrecheInfo(id, { name, contact, email, phone, address }) {
+  assertAvailable();
+  const { rows } = await queryTolerantToBadUuid(
+    `UPDATE creches
+     SET name = $1, contact = $2, email = $3, phone = $4, address = $5
+     WHERE id = $6
+     RETURNING *`,
+    [name, contact, email, phone || null, address, id]
+  );
+  return mapCreche(rows[0]);
+}
+
+async function resetCrechePassword(id, passwordHash) {
+  assertAvailable();
+  const { rows } = await queryTolerantToBadUuid(
+    'UPDATE creches SET password_hash = $1 WHERE id = $2 RETURNING *',
+    [passwordHash, id]
+  );
+  return mapCreche(rows[0]);
+}
+
 // --- Pending orders (crèche self-service orders) ---
 
 async function getAllOrders() {
@@ -243,6 +264,8 @@ module.exports = {
   createCreche,
   updateCrecheStatus,
   setCrecheActive,
+  updateCrecheInfo,
+  resetCrechePassword,
   getAllOrders,
   getOrdersByCrecheId,
   getOrderById,

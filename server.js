@@ -883,6 +883,54 @@ app.post('/admin/creches/:id/activer', requireAuth, async (req, res) => {
   res.redirect(`/admin/creches/${req.params.id}/compte`);
 });
 
+app.post('/admin/creches/:id/modifier-infos', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect(`/admin/creches/${req.params.id}/compte`);
+  }
+  const { name, contact, email, phone, address } = req.body;
+  if (!name || !contact || !email || !address) {
+    req.session.flash = { error: 'Nom, contact, email et adresse sont obligatoires.' };
+    return res.redirect(`/admin/creches/${req.params.id}/compte`);
+  }
+  try {
+    const creche = await db.updateCrecheInfo(req.params.id, {
+      name: name.trim(),
+      contact: contact.trim(),
+      email: email.trim().toLowerCase(),
+      phone: (phone || '').trim(),
+      address: address.trim(),
+    });
+    req.session.flash = creche
+      ? { success: 'Informations mises à jour.' }
+      : { error: 'Établissement introuvable.' };
+  } catch (e) {
+    if (e.code === '23505') {
+      req.session.flash = { error: 'Un autre établissement utilise déjà cet email.' };
+    } else {
+      console.error('updateCrecheInfo error:', e.message);
+      req.session.flash = { error: 'Erreur lors de la mise à jour.' };
+    }
+  }
+  res.redirect(`/admin/creches/${req.params.id}/compte`);
+});
+
+app.post('/admin/creches/:id/reinitialiser-mdp', requireAuth, async (req, res) => {
+  if (!db.isAvailable()) {
+    req.session.flash = { error: DB_UNAVAILABLE_MESSAGE };
+    return res.redirect(`/admin/creches/${req.params.id}/compte`);
+  }
+  const newPassword = crypto.randomBytes(6).toString('base64url'); // 8-char readable temp password
+  const hash = await bcrypt.hash(newPassword, 10);
+  const creche = await db.resetCrechePassword(req.params.id, hash);
+  req.session.flash = creche
+    ? {
+        success: `Mot de passe réinitialisé pour "${creche.name}". Nouveau mot de passe temporaire : ${newPassword} — communiquez-le à l'établissement, il n'est affiché qu'une seule fois.`,
+      }
+    : { error: 'Établissement introuvable.' };
+  res.redirect(`/admin/creches/${req.params.id}/compte`);
+});
+
 // ================================================================
 // ADMIN — CRÈCHE ORDERS MANAGEMENT
 // ================================================================

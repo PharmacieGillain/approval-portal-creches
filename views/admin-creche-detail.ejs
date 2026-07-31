@@ -60,6 +60,7 @@
               <span class="badge badge-success">Compte actif</span>
             <% } %>
           </div>
+          <p class="text-muted" style="font-size:.85rem;margin-top:.5rem">Inscrit le <%= formatDateTime(creche.createdAt) %></p>
         </div>
         <div>
           <% if (creche.active === false) { %>
@@ -80,20 +81,40 @@
         </div>
       </div>
 
-      <dl class="info-list" style="margin-top:1.25rem">
-        <dt>Contact</dt>
-        <dd><%= creche.contact %></dd>
-        <dt>Email</dt>
-        <dd><a href="mailto:<%= creche.email %>" class="link"><%= creche.email %></a></dd>
-        <% if (creche.phone) { %>
-        <dt>Téléphone</dt>
-        <dd><%= creche.phone %></dd>
-        <% } %>
-        <dt>Adresse</dt>
-        <dd><%= creche.address %></dd>
-        <dt>Inscrit le</dt>
-        <dd><%= formatDateTime(creche.createdAt) %></dd>
-      </dl>
+      <form method="POST" action="/admin/creches/<%= creche.id %>/modifier-infos" style="margin-top:1.25rem;max-width:520px">
+        <div class="form-group">
+          <label class="form-label">Nom de l'établissement</label>
+          <input type="text" name="name" class="form-input" value="<%= creche.name %>" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Personne de contact</label>
+          <input type="text" name="contact" class="form-input" value="<%= creche.contact %>" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-input" value="<%= creche.email %>" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Téléphone <span class="optional">(optionnel)</span></label>
+          <input type="text" name="phone" class="form-input" value="<%= creche.phone || '' %>">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Adresse</label>
+          <textarea name="address" class="form-textarea" rows="2" required><%= creche.address %></textarea>
+        </div>
+        <div class="form-actions-bar" style="justify-content:space-between">
+          <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        </div>
+      </form>
+
+      <div style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border)">
+        <form method="POST" action="/admin/creches/<%= creche.id %>/reinitialiser-mdp">
+          <button type="submit" class="btn btn-secondary"
+            onclick="return confirm('Réinitialiser le mot de passe de <%= creche.name %> ? Un nouveau mot de passe temporaire sera généré et affiché une seule fois — pensez à le communiquer à l\'établissement.')">
+            Réinitialiser le mot de passe
+          </button>
+        </form>
+      </div>
     </div>
 
     <!-- Orders / invoices -->
